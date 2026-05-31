@@ -95,6 +95,13 @@ pip install -r requirements.txt
 - DeepSeek API Key（必填）
 - QQ邮箱 SMTP 授权码（邮件推送可选）
 
+## 变更记录
+
+| 日期 | 版本 | 变更内容 |
+|------|------|---------|
+| 2026-05-31 | v1.1 | 邮件HTML模板升级为现代卡片风（渐变头部 + 三栏网格 + 信心度色标） |
+| 2026-05-31 | v1.0 | 首次发布：多源采集 + AI分析 + 邮件/CLI/Web推送 + GitHub Actions |
+
 ## 当前状态
 
 | 模块 | 状态 | 备注 |
@@ -103,6 +110,20 @@ pip install -r requirements.txt
 | 新浪财经 | ✅ 稳定 | 要闻，实测31条/次 |
 | 财联社 | ⚠️ 关闭 | API接口404，需更新endpoint |
 | 雪球 | 📦 关闭 | 需配置cookie后启用 |
-| AI分析 | ✅ 就绪 | 待配置DeepSeek API Key |
-| 邮箱推送 | ✅ 就绪 | 待配置QQ邮箱SMTP |
-| GitHub Actions | ✅ 就绪 | 待推送到GitHub仓库 |
+| AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
+| 邮箱推送 | ✅ 就绪 | QQ邮箱SMTP 已配置，正常运行 |
+| GitHub Actions | ⚠️ 待验证 | 代码已推送，Secrets已配置，待交易日自动触发验证 |
+| GitHub Pages | ⚠️ 待验证 | 需在仓库Settings中启用Pages（Source: main, /docs） |
+
+## 后续计划
+
+| 优先级 | 事项 | 说明 |
+|--------|------|------|
+| P0 | GitHub Actions 首跑验证 | 下一个交易日确认定时推送正常工作 |
+| P0 | GitHub Pages 启用 | 仓库 Settings → Pages → main /docs |
+| P1 | 邮件模板迭代 | 根据实际使用反馈调整配色/排版 |
+| P1 | GitHub Pages 网页美化 | 网页版同步邮件模板的卡片风格 |
+| P2 | 财联社爬虫修复 | 更新API endpoint，恢复正常采集 |
+| P2 | 微信推送接入 | Server酱 / 企业微信Bot |
+| P2 | 雪球爬虫启用 | 配置cookie后接入社区情绪数据 |
+| P3 | 推荐效果回测 | 每日记录推荐标的次日表现，评估AI准确率 |
