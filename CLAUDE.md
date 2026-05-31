@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ## 项目架构
 
 ```
-每日推荐app/
+Daily Stock Picks/
 ├── src/
 │   ├── main.py              # 主入口，编排三阶段流程
 │   ├── models.py            # 数据模型：NewsItem, Recommendation, DailyReport
