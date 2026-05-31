@@ -47,7 +47,7 @@ def load_config() -> dict:
     }
 
 
-def run(date: str = None, dry_run: bool = False) -> dict:
+def run(date: str = None, dry_run: bool = False, selected_channels: list = None) -> dict:
     """主流程：采集 → 聚合 → AI分析 → 推送"""
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
@@ -100,15 +100,19 @@ def run(date: str = None, dry_run: bool = False) -> dict:
             print(text)
     else:
         logger.info("Phase 3: 推送分发...")
-        pusher = Pusher(config)
+        pusher = Pusher(config, selected_channels=selected_channels)
         results = pusher.push(report)
 
         # CLI输出
-        cli_output = results.get("cli", "")
-        if cli_output:
-            print(cli_output)
+        if "cli" in pusher.channels:
+            cli_pusher = pusher.channels["cli"]
+            cli_text = getattr(cli_pusher, "output_text", "")
+            if cli_text:
+                print(cli_text)
 
-        logger.info(f"推送结果: email={results.get('email')}, web={bool(results.get('web'))}")
+        # 汇总日志
+        enabled_names = list(results.keys())
+        logger.info(f"推送结果: {', '.join(f'{k}={v}' for k, v in results.items())}")
 
     # 汇总
     rec_count = len(report.recommendations)
@@ -128,6 +132,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="干运行模式（不推送）")
     parser.add_argument("--local", action="store_true", help="本地模式（同--dry-run，仅CLI输出）")
     parser.add_argument("--scrape-only", action="store_true", help="仅测试采集（不分析）")
+    parser.add_argument("--push", "--channels", type=str, default=None,
+        help="指定推送通道，逗号分隔 (email,wechat,cli,web)，默认使用config.yaml配置")
     args = parser.parse_args()
 
     if args.scrape_only:
@@ -141,7 +147,13 @@ def main():
         return
 
     dry_run = args.dry_run or args.local
-    result = run(date=args.date, dry_run=dry_run)
+
+    # 解析 --push 参数
+    selected_channels = None
+    if args.push:
+        selected_channels = [ch.strip() for ch in args.push.split(",")]
+
+    result = run(date=args.date, dry_run=dry_run, selected_channels=selected_channels)
 
     if result["status"] == "no_data":
         sys.exit(1)

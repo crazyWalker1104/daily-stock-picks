@@ -20,7 +20,8 @@ push:
   email:
     enabled: true
   wechat:
-    enabled: false   # 后续迭代
+    enabled: false
+    provider: serverchan  # serverchan | wecombot (预留企业微信Bot)
   cli:
     enabled: true
   web:

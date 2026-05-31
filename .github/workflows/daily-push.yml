@@ -66,6 +66,7 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          WECHAT_SENDKEY: ${{ secrets.WECHAT_SENDKEY }}
         run: |
           if [ -n "${{ github.event.inputs.date }}" ]; then
             python -m src.main --date "${{ github.event.inputs.date }}"

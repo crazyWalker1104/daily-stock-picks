@@ -24,6 +24,33 @@ export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897
 pip install -r requirements.txt
 ```
 
+## 标准文件路径索引
+
+| 文件 | 路径 | 用途 | 变更频率 |
+|:---|:---|:---|:---|
+| **项目说明** | [CLAUDE.md](CLAUDE.md) | AI助手上下文：架构、约定、状态 | 每次会话更新 |
+| **开发日志** | [DEVLOG.md](DEVLOG.md) | 每日开发记录、路线图、待办池 | 每次开发会话更新 |
+| **README** | [README.md](README.md) | 面向用户的说明文档 | 版本发布时更新 |
+| **主入口** | [src/main.py](src/main.py) | CLI参数解析、三阶段编排、入口函数 | 新增通道/参数时 |
+| **数据模型** | [src/models.py](src/models.py) | NewsItem / Recommendation / DailyReport 定义 | 新增数据字段时 |
+| **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
+| **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
+| **格式化** | [src/formatter.py](src/formatter.py) | Markdown/纯文本/HTML邮件/HTML网页 四种输出 | 改模板样式时 |
+| **推送模块** | [src/pusher.py](src/pusher.py) | BasePusher + 4通道 + 注册表 + Pusher管理器 | 新增推送通道时 |
+| **爬虫基类** | [src/scrapers/base.py](src/scrapers/base.py) | UA轮换、重试、HTML/JSON通用获取 | 不常改 |
+| **爬虫注册** | [src/scrapers/__init__.py](src/scrapers/__init__.py) | SCRAPER_REGISTRY + collect_all_news() | 新增爬虫时 |
+| **东方财富** | [src/scrapers/eastmoney.py](src/scrapers/eastmoney.py) | 研报+板块资金流+概念资金流 | API变更时 |
+| **新浪财经** | [src/scrapers/sina.py](src/scrapers/sina.py) | 要闻滚动+龙虎榜 | API变更时 |
+| **财联社** | [src/scrapers/cls.py](src/scrapers/cls.py) | 快讯（默认关闭） | 修复后启用 |
+| **雪球** | [src/scrapers/xueqiu.py](src/scrapers/xueqiu.py) | 社区情绪（需cookie） | 配置后启用 |
+| **环境变量** | [.env.example](.env.example) | 所有环境变量模板（API Key/SMTP/微信） | 新增配置项时 |
+| **应用配置** | [config/config.example.yaml](config/config.example.yaml) | 功能开关/爬虫/AI/推送参数 | 新增功能开关时 |
+| **CI/CD** | [.github/workflows/daily-push.yml](.github/workflows/daily-push.yml) | 交易日8:30自动运行+提交网页 | 改流程时 |
+| **依赖** | [requirements.txt](requirements.txt) | Python依赖列表 | 新增库时 |
+| **原始数据** | data/*_raw.json | 爬虫采集的原始新闻缓存 | 每日自动 |
+| **报告输出** | output/*_report.json | AI分析后的结构化报告 | 每日自动 |
+| **网页归档** | docs/*.html | GitHub Pages 静态网页 | 每日自动 |
+
 ## 项目架构
 
 ```
@@ -33,8 +60,8 @@ Daily Stock Picks/
 │   ├── models.py            # 数据模型：NewsItem, Recommendation, DailyReport
 │   ├── aggregator.py        # 聚合器：去重 → 关键词打分 → 排序截断
 │   ├── ai_analyzer.py       # AI分析：DeepSeek API 调用 + Prompt 管理
-│   ├── formatter.py         # 格式化：Markdown / 纯文本 / HTML
-│   ├── pusher.py            # 推送：EmailPusher, CLIPusher, WebPusher
+│   ├── formatter.py         # 格式化：Markdown / 纯文本 / 邮件HTML / 网页HTML
+│   ├── pusher.py            # 推送：BasePusher基类 + 4通道 + PUSHER_REGISTRY
 │   └── scrapers/
 │       ├── __init__.py      # 爬虫注册中心 SCRAPER_REGISTRY
 │       ├── base.py          # 基类：UA轮换、重试、HTML/JSON通用方法
@@ -44,24 +71,53 @@ Daily Stock Picks/
 │       └── xueqiu.py        # 雪球（需cookie，默认关闭）
 ├── config/
 │   └── config.example.yaml  # 配置模板（复制为config.yaml使用）
-├── output/                  # 每日报告JSON/MD
+├── output/                  # 每日报告JSON
 ├── data/                    # 原始采集数据缓存
 ├── docs/                    # GitHub Pages 网页归档
 ├── .github/workflows/
 │   └── daily-push.yml       # 每个交易日 8:30 CST 触发
 ├── .env.example             # 环境变量模板
 ├── requirements.txt
-└── README.md
+├── README.md
+├── CLAUDE.md                # AI助手上下文（本文件）
+└── DEVLOG.md                # 开发日志 + 路线图 + 待办池
 ```
 
 ## 数据流
 
 ```
 采集 (scrapers/) → 聚合 (aggregator.py) → AI分析 (ai_analyzer.py) → 推送 (pusher.py)
-                                                                      ├── 邮箱 (SMTP)
+                                                                      ├── 邮箱 (SMTP QQ/163)
+                                                                      ├── 微信 (Server酱)
                                                                       ├── CLI  (stdout)
                                                                       └── Web  (docs/*.html)
 ```
+
+## 开发工作流
+
+### 日常开发会话
+
+1. **开始前** — 查看 [DEVLOG.md](DEVLOG.md) 了解当前阶段和待办事项
+2. **开发中** — 遵循下方"关键约定"中的各模块规范
+3. **收尾时** — 更新 [DEVLOG.md](DEVLOG.md) 记录：
+   - 今日完成的事项（带符号标注：🚀新功能 🐛修复 🔧重构 📝文档）
+   - 遇到的问题和解决方案
+   - 新的待办事项
+4. **提交时** — Commit message 引用 Phase/任务编号，例如 `feat: 市场数据注入 (Phase 1.1)`
+
+### 添加新功能的标准流程
+
+- **新爬虫**：写爬虫类 → [__init__.py](src/scrapers/__init__.py) 注册 → [config.example.yaml](config/config.example.yaml) 加开关 → [CLAUDE.md](CLAUDE.md) 更新状态表
+- **新推送通道**：写Pusher类 → [pusher.py](src/pusher.py) 注册表加一行 → [config.example.yaml](config/config.example.yaml) 加开关 → [.env.example](.env.example) 加配置 → [daily-push.yml](.github/workflows/daily-push.yml) 加Secret
+- **新数据模型**：在 [models.py](src/models.py) 定义 dataclass → 相关模块导入使用
+
+### 代码风格
+
+- Python 类型注解：所有函数签名标注参数和返回值类型
+- 异常处理：爬虫/推送失败不阻断主流程，返回空列表或 False
+- 日志：使用 `logging.getLogger(__name__)`，关键节点打 INFO，调试细节打 DEBUG
+- 编码：Windows 环境下注意 GBK 兼容，终端输出做 UTF-8 wrap
+- 文档字符串：使用中文，类和公开方法必须有 docstring
 
 ## 关键约定
 
@@ -84,8 +140,11 @@ Daily Stock Picks/
 - API不可用时降级为空报告，不阻断管道
 
 ### 推送
+- 推送通道继承 `BasePusher` 抽象基类，通过 `PUSHER_REGISTRY` 注册
+- 通道选择：YAML `enabled` 标志 或 CLI `--push email,wechat,cli,web` 参数
 - 推送通道独立实现，各通道失败互不影响
-- 邮件正文同时包含纯文本和HTML版本
+- 邮件正文同时包含纯文本和HTML版本，支持 QQ邮箱(587/STARTTLS) 和 163邮箱(465/SSL)
+- 微信推送通过 Server酱 (ServerChan) 实现
 - CLI输出需处理 Windows GBK 编码问题
 
 ## 环境要求
@@ -99,6 +158,8 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-05-31 | v1.3 | 文档完善：新增DEVLOG.md开发日志 + CLAUDE.md标准文件路径索引 + 分阶段路线图 + 开发工作流指引 |
+| 2026-05-31 | v1.2 | 推送模块重构：BasePusher抽象基类 + 通道注册表 + 微信推送(Server酱) + 163邮箱支持(SSL) + CLI `--push` 通道选择 |
 | 2026-05-31 | v1.1 | 邮件HTML模板升级为现代卡片风（渐变头部 + 三栏网格 + 信心度色标） |
 | 2026-05-31 | v1.0 | 首次发布：多源采集 + AI分析 + 邮件/CLI/Web推送 + GitHub Actions |
 
@@ -111,19 +172,25 @@ Daily Stock Picks/
 | 财联社 | ⚠️ 关闭 | API接口404，需更新endpoint |
 | 雪球 | 📦 关闭 | 需配置cookie后启用 |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
-| 邮箱推送 | ✅ 就绪 | QQ邮箱SMTP 已配置，正常运行 |
+| QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
+| 163邮箱推送 | ✅ 新增 | SMTP 465/SSL，授权码登录 |
+| 微信推送 | ✅ 新增 | Server酱 (sct.ftqq.com)，需 WECHAT_SENDKEY |
+| 通道选择 | ✅ 新增 | YAML `enabled` 或 CLI `--push email,wechat,...` |
 | GitHub Actions | ⚠️ 待验证 | 代码已推送，Secrets已配置，待交易日自动触发验证 |
 | GitHub Pages | ⚠️ 待验证 | 需在仓库Settings中启用Pages（Source: main, /docs） |
 
 ## 后续计划
 
-| 优先级 | 事项 | 说明 |
-|--------|------|------|
-| P0 | GitHub Actions 首跑验证 | 下一个交易日确认定时推送正常工作 |
-| P0 | GitHub Pages 启用 | 仓库 Settings → Pages → main /docs |
-| P1 | 邮件模板迭代 | 根据实际使用反馈调整配色/排版 |
-| P1 | GitHub Pages 网页美化 | 网页版同步邮件模板的卡片风格 |
-| P2 | 财联社爬虫修复 | 更新API endpoint，恢复正常采集 |
-| P2 | 微信推送接入 | Server酱 / 企业微信Bot |
-| P2 | 雪球爬虫启用 | 配置cookie后接入社区情绪数据 |
-| P3 | 推荐效果回测 | 每日记录推荐标的次日表现，评估AI准确率 |
+详细路线图和待办事项见 **[DEVLOG.md](DEVLOG.md)**，以下为阶段概览：
+
+| Phase | 周期 | 目标 | 入口 |
+|:---|:---|:---|:---|
+| Phase 1 | 2026-05-31 ~ 06-07 | 基础夯实：市场数据注入 + 次日追踪 + akshare | [DEVLOG.md](DEVLOG.md) |
+| Phase 2 | 2026-06-08 ~ 06-14 | 量化因子：资金×情绪确认 + 技术面过滤 + 多因子打分 | [DEVLOG.md](DEVLOG.md) |
+| Phase 3 | 2026-06-15 ~ 06-21 | 数据沉淀：SQLite推荐库 + 因子有效性检验 + 策略分层 | [DEVLOG.md](DEVLOG.md) |
+| Phase 4 | 2026-06-22+ | 策略进化：新数据源 + 行业热力图 + 报告升级 | [DEVLOG.md](DEVLOG.md) |
+
+**当前优先事项（P0）：**
+- [ ] GitHub Actions 首跑验证 — 下个交易日确认
+- [ ] GitHub Pages 启用 — 仓库 Settings → Pages → main /docs
+- [ ] 安装 akshare，开始 Phase 1.1 市场数据注入

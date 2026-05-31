@@ -1,12 +1,15 @@
-"""推送模块 — 多通道分发（邮箱 + CLI + Web）"""
+"""推送模块 — 多通道分发（邮箱 + 微信 + CLI + Web）"""
 
 import os
 import logging
 import smtplib
+from abc import ABC, abstractmethod
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-from typing import List
+from typing import Dict, List, Optional
+
+import requests
 
 from src.models import DailyReport
 from src.formatter import format_markdown, format_plain, format_html_page, format_email_html
@@ -14,10 +17,39 @@ from src.formatter import format_markdown, format_plain, format_html_page, forma
 logger = logging.getLogger(__name__)
 
 
-class EmailPusher:
-    """邮箱推送（SMTP）"""
+# ═══════════════════════════════════════════════════════════
+# 抽象基类
+# ═══════════════════════════════════════════════════════════
 
-    def __init__(self):
+class BasePusher(ABC):
+    """推送通道基类 — 所有推送渠道继承此类"""
+
+    channel_name: str = "base"
+
+    def __init__(self, config: dict = None):
+        self.config = config or {}
+
+    def is_configured(self) -> bool:
+        """检查该通道是否已正确配置（凭证齐全），子类可按需覆写"""
+        return True
+
+    @abstractmethod
+    def send(self, report: DailyReport) -> bool:
+        """执行推送，返回 True/False"""
+        ...
+
+
+# ═══════════════════════════════════════════════════════════
+# 邮箱推送（QQ邮箱 + 163邮箱）
+# ═══════════════════════════════════════════════════════════
+
+class EmailPusher(BasePusher):
+    """邮箱推送 — 支持 QQ邮箱(smtp.qq.com:587/STARTTLS) 和 163邮箱(smtp.163.com:465/SSL)"""
+
+    channel_name = "email"
+
+    def __init__(self, config: dict = None):
+        super().__init__(config)
         self.host = os.getenv("SMTP_HOST", "smtp.qq.com")
         self.port = int(os.getenv("SMTP_PORT", "587"))
         self.user = os.getenv("SMTP_USER", "")
@@ -34,7 +66,6 @@ class EmailPusher:
             return False
 
         subject = f"📊 每日A股速递 | {report.date}"
-        body = format_markdown(report)
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
@@ -46,29 +77,100 @@ class EmailPusher:
         msg.attach(MIMEText(format_email_html(report), "html", "utf-8"))
 
         try:
-            with smtplib.SMTP(self.host, self.port, timeout=15) as server:
-                server.starttls()
-                server.login(self.user, self.password)
-                server.sendmail(self.user, [self.recipient], msg.as_string())
-            logger.info("邮件发送成功")
+            if self.port == 465:
+                # SSL直连（163邮箱推荐）
+                with smtplib.SMTP_SSL(self.host, self.port, timeout=15) as server:
+                    server.login(self.user, self.password)
+                    server.sendmail(self.user, [self.recipient], msg.as_string())
+            else:
+                # STARTTLS升级（QQ邮箱推荐 587）
+                with smtplib.SMTP(self.host, self.port, timeout=15) as server:
+                    server.starttls()
+                    server.login(self.user, self.password)
+                    server.sendmail(self.user, [self.recipient], msg.as_string())
+            logger.info(f"邮件发送成功 (via {self.host}:{self.port})")
             return True
         except Exception as e:
-            logger.error(f"邮件发送失败: {e}")
+            logger.error(f"邮件发送失败 ({self.host}:{self.port}): {e}")
             return False
 
 
-class CLIPusher:
-    """命令行推送"""
+# ═══════════════════════════════════════════════════════════
+# 微信推送（Server酱）
+# ═══════════════════════════════════════════════════════════
 
-    def send(self, report: DailyReport) -> str:
-        """返回格式化文本"""
-        return format_plain(report)
+class WeChatPusher(BasePusher):
+    """微信推送 — 通过Server酱(ServerChan)推送到微信
+
+    使用步骤:
+    1. 前往 https://sct.ftqq.com/ 登录获取 SendKey
+    2. 设置环境变量 WECHAT_SENDKEY=你的SendKey
+    3. 在微信中关注「方糖」公众号即可接收推送
+    """
+
+    channel_name = "wechat"
+
+    def __init__(self, config: dict = None):
+        super().__init__(config)
+        self.sendkey = os.getenv("WECHAT_SENDKEY", "")
+        self.api_url = "https://sctapi.ftqq.com"
+
+    def is_configured(self) -> bool:
+        return bool(self.sendkey)
+
+    def send(self, report: DailyReport) -> bool:
+        """通过Server酱发送微信推送"""
+        if not self.is_configured():
+            logger.warning("微信推送未配置 (WECHAT_SENDKEY为空)，跳过")
+            return False
+
+        title = f"📊 每日A股速递 | {report.date}"
+        body = format_markdown(report)
+
+        try:
+            resp = requests.post(
+                f"{self.api_url}/{self.sendkey}.send",
+                data={"title": title, "desp": body},
+                timeout=15,
+            )
+            result = resp.json()
+            if result.get("code") == 0:
+                logger.info("微信推送成功 (Server酱)")
+                return True
+            else:
+                logger.error(f"微信推送失败: {result.get('message', '未知错误')}")
+                return False
+        except Exception as e:
+            logger.error(f"微信推送异常: {e}")
+            return False
 
 
-class WebPusher:
-    """网页推送 — 生成HTML到docs/目录"""
+# ═══════════════════════════════════════════════════════════
+# 命令行输出
+# ═══════════════════════════════════════════════════════════
 
-    def __init__(self, output_dir: str = "docs"):
+class CLIPusher(BasePusher):
+    """命令行推送 — 格式化文本输出到终端"""
+
+    channel_name = "cli"
+
+    def send(self, report: DailyReport) -> bool:
+        """生成格式化文本，存入 self.output_text 供调用方打印"""
+        self.output_text = format_plain(report)
+        return True
+
+
+# ═══════════════════════════════════════════════════════════
+# 网页推送（GitHub Pages）
+# ═══════════════════════════════════════════════════════════
+
+class WebPusher(BasePusher):
+    """网页推送 — 生成HTML到docs/目录（GitHub Pages）"""
+
+    channel_name = "web"
+
+    def __init__(self, config: dict = None, output_dir: str = "docs"):
+        super().__init__(config)
         self.output_dir = output_dir
 
     def get_history_dates(self) -> List[str]:
@@ -81,8 +183,8 @@ class WebPusher:
                 dates.append(f.replace(".html", ""))
         return sorted(dates, reverse=True)
 
-    def save(self, report: DailyReport) -> str:
-        """保存报告HTML到docs/目录"""
+    def send(self, report: DailyReport) -> bool:
+        """保存报告HTML到docs/目录，路径存入 self.output_path"""
         os.makedirs(self.output_dir, exist_ok=True)
 
         history = self.get_history_dates()
@@ -103,33 +205,64 @@ class WebPusher:
             f.write(html)
         logger.info(f"首页已更新: {index_path}")
 
-        return filepath
+        self.output_path = filepath
+        return True
 
+
+# ═══════════════════════════════════════════════════════════
+# 通道注册表 — 新增通道只需在此添加一行
+# ═══════════════════════════════════════════════════════════
+
+PUSHER_REGISTRY: Dict[str, type] = {
+    "email": EmailPusher,
+    "wechat": WeChatPusher,
+    "cli": CLIPusher,
+    "web": WebPusher,
+}
+
+
+# ═══════════════════════════════════════════════════════════
+# 推送管理器
+# ═══════════════════════════════════════════════════════════
 
 class Pusher:
-    """推送管理器 — 协调所有推送通道"""
+    """推送管理器 — 动态加载推送通道"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, selected_channels: Optional[List[str]] = None):
         self.config = config
         push_config = config.get("push", {})
+        self.channels: Dict[str, BasePusher] = {}
 
-        self.email_pusher = EmailPusher() if push_config.get("email", {}).get("enabled", False) else None
-        self.cli_pusher = CLIPusher()
-        self.web_pusher = WebPusher() if push_config.get("web", {}).get("enabled", False) else None
+        for channel_key, pusher_cls in PUSHER_REGISTRY.items():
+            # 判断是否启用该通道
+            if selected_channels is not None:
+                # CLI 明确指定 → 只看 CLI 参数
+                enabled = channel_key in selected_channels
+            else:
+                # 回退到 YAML 配置
+                channel_cfg = push_config.get(channel_key, {})
+                enabled = channel_cfg.get("enabled", False)
+
+                # CLI 通道默认开启（除非显式设为 false）
+                if channel_key == "cli" and "cli" not in push_config:
+                    enabled = True
+
+            if enabled:
+                try:
+                    instance = pusher_cls(config=config)
+                    self.channels[channel_key] = instance
+                    logger.info(f"推送通道 [{channel_key}] 已启用")
+                except Exception as e:
+                    logger.error(f"推送通道 [{channel_key}] 初始化失败: {e}")
 
     def push(self, report: DailyReport) -> dict:
-        """执行所有启用的推送通道，返回执行结果"""
-        results = {"email": False, "cli": "", "web": ""}
-
-        # 邮箱推送
-        if self.email_pusher:
-            results["email"] = self.email_pusher.send(report)
-
-        # CLI输出（始终可用）
-        results["cli"] = self.cli_pusher.send(report)
-
-        # 网页生成
-        if self.web_pusher:
-            results["web"] = self.web_pusher.save(report)
-
+        """执行所有启用的推送通道，返回各通道执行结果"""
+        results = {}
+        for channel_key, pusher in self.channels.items():
+            try:
+                success = pusher.send(report)
+                results[channel_key] = success
+            except Exception as e:
+                logger.error(f"推送通道 [{channel_key}] 执行异常: {e}")
+                results[channel_key] = False
         return results
