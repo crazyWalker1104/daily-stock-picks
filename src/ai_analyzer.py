@@ -81,8 +81,15 @@ class AIAnalyzer:
         else:
             self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def analyze(self, news_text: str, date: str = None) -> DailyReport:
-        """分析新闻数据，生成每日推荐报告"""
+    def analyze(self, news_text: str, date: str = None,
+                market_context: str = "") -> DailyReport:
+        """分析新闻数据，生成每日推荐报告
+
+        Args:
+            news_text: 聚合后的新闻文本
+            date: 日期字符串 YYYY-MM-DD
+            market_context: 市场实况数据（指数/资金流等），由 market_data 模块生成
+        """
         if date is None:
             date = datetime.now().strftime("%Y-%m-%d")
 
@@ -105,15 +112,24 @@ class AIAnalyzer:
             )
 
         # 构造用户消息（需控制token量）
-        max_len = 12000  # DeepSeek上下文较长，但保持精简
+        # 新闻文本限额 = 总量 - 市场数据占用
+        market_overhead = len(market_context) if market_context else 0
+        max_len = 12000 - market_overhead
         if len(news_text) > max_len:
             news_text = news_text[:max_len] + "\n...(内容已截断)"
 
-        user_prompt = f"""以下是今日（{date}）采集的财经新闻和市场数据，请进行分析：
+        # 组装 Prompt：市场数据 + 新闻
+        sections = [f"以下是今日（{date}）的财经信息，请进行分析：\n"]
 
-{news_text}
+        if market_context:
+            sections.append(market_context)
+            sections.append("---\n")
 
-请严格按照JSON格式输出分析结果。"""
+        sections.append("## 📰 今日财经新闻及研报汇总\n")
+        sections.append(news_text)
+        sections.append("\n请严格按照JSON格式输出分析结果。")
+
+        user_prompt = "\n".join(sections)
 
         try:
             logger.info(f"调用 {self.provider} API ({self.model}) 进行分析...")

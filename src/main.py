@@ -19,6 +19,7 @@ import yaml
 from src.scrapers import collect_all_news
 from src.aggregator import aggregate
 from src.ai_analyzer import AIAnalyzer
+from src.market_data import get_market_context
 from src.pusher import Pusher
 
 # 日志配置
@@ -74,11 +75,14 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
             json.dump([n.to_dict() for n in all_news], f, ensure_ascii=False, indent=2)
         logger.info(f"原始数据已保存: {raw_path}")
 
-    # Phase 2: 聚合 + AI分析
+    # Phase 2: 聚合 + 市场数据 + AI分析
+    logger.info("Phase 2: 采集市场数据...")
+    market_context = get_market_context()
+
     logger.info("Phase 2: AI分析...")
     news_text = aggregate(all_news, max_for_ai=40)
     analyzer = AIAnalyzer(config)
-    report = analyzer.analyze(news_text, date)
+    report = analyzer.analyze(news_text, date, market_context=market_context)
 
     # 保存报告JSON
     report_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output", f"{date}_report.json")

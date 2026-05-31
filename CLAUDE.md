@@ -32,6 +32,7 @@ pip install -r requirements.txt
 | **开发日志** | [DEVLOG.md](DEVLOG.md) | 每日开发记录、路线图、待办池 | 每次开发会话更新 |
 | **README** | [README.md](README.md) | 面向用户的说明文档 | 版本发布时更新 |
 | **主入口** | [src/main.py](src/main.py) | CLI参数解析、三阶段编排、入口函数 | 新增通道/参数时 |
+| **市场数据** | [src/market_data.py](src/market_data.py) | 指数/资金流实时采集 + Prompt格式化注入 | 新增数据维度时 |
 | **数据模型** | [src/models.py](src/models.py) | NewsItem / Recommendation / DailyReport 定义 | 新增数据字段时 |
 | **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
@@ -158,7 +159,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
-| 2026-05-31 | v1.3 | 文档完善：新增DEVLOG.md开发日志 + CLAUDE.md标准文件路径索引 + 分阶段路线图 + 开发工作流指引 |
+| 2026-05-31 | v1.3 | Phase 1.1 市场数据注入：src/market_data.py（指数+资金流+成交额）+ 文档体系（DEVLOG + CLAUDE.md路径索引） |
 | 2026-05-31 | v1.2 | 推送模块重构：BasePusher抽象基类 + 通道注册表 + 微信推送(Server酱) + 163邮箱支持(SSL) + CLI `--push` 通道选择 |
 | 2026-05-31 | v1.1 | 邮件HTML模板升级为现代卡片风（渐变头部 + 三栏网格 + 信心度色标） |
 | 2026-05-31 | v1.0 | 首次发布：多源采集 + AI分析 + 邮件/CLI/Web推送 + GitHub Actions |

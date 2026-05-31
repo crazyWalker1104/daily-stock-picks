@@ -28,7 +28,7 @@
 
 | # | 任务 | 状态 | 优先级 | 预计行数 | 依赖 |
 |:---|:---|:---|:---|:---|:---|
-| 1.1 | 市场实况数据注入 — AI Prompt 增加结构化行情数据 | ⏳ | P0 | ~80 | — |
+| 1.1 | 市场实况数据注入 — AI Prompt 增加结构化行情数据 | ✅ | P0 | ~150 | — |
 | 1.2 | 次日推荐追踪 — 自动对比昨日推荐 vs 今日涨跌 | ⏳ | P0 | ~120 | — |
 | 1.3 | 依赖升级 — 安装 akshare，获取个股K线/北向资金 | ⏳ | P0 | ~10 | — |
 | 1.4 | `requirements.txt` 补全 akshare | ⏳ | P1 | ~1 | 1.3 |
@@ -66,7 +66,7 @@
 
 ## 每日记录
 
-### 2026-05-31 (周六) — v1.2
+### 2026-05-31 (周六) — v1.3
 
 **完成事项：**
 - 🚀 推送模块重构：`BasePusher` 抽象基类 + `PUSHER_REGISTRY` 通道注册表
@@ -74,23 +74,30 @@
 - 🚀 新增163邮箱支持：端口465→SMTP_SSL，587→STARTTLS 自动适配
 - 🚀 CLI 新增 `--push` 通道选择参数（逗号分隔，支持 email,wechat,cli,web）
 - 🚀 通道选择支持双模式：CLI `--push` 指定 或 YAML `enabled` 标志
+- 🚀 **Phase 1.1 完成**：新增 [src/market_data.py](src/market_data.py) 市场实况数据模块
+  - 三大指数实时行情（上证/深证/创业板）
+  - 行业板块主力资金净流入/流出 TOP5
+  - 两市成交额统计
+  - 格式化为结构化文本注入 AI Prompt
+  - 休日/API故障自动降级，不阻断管道
 - 🐛 修复 CLI 默认开启逻辑：`"cli" not in push_config` 正确检查 cli 段是否存在
 - 🐛 修复163邮箱测试：SMTP_HOST 从 qq.com 改为 163.com 后发送成功
-- 📝 更新 CLAUDE.md 变更记录、状态表、后续计划
+- 📝 新增 [DEVLOG.md](DEVLOG.md) 开发日志 + 4阶段路线图
+- 📝 更新 [CLAUDE.md](CLAUDE.md) 标准文件路径索引 + 开发工作流指引
 - 📝 更新 .env.example 添加163邮箱配置示例
 
 **当前状态：**
-- 5 个文件已修改但未提交：[src/pusher.py](src/pusher.py), [src/main.py](src/main.py), [config/config.example.yaml](config/config.example.yaml), [.env.example](.env.example), [.github/workflows/daily-push.yml](.github/workflows/daily-push.yml)
+- v1.2 已提交推送（commit: 5a6046e）
+- v1.3（Phase 1.1 市场数据 + 文档体系）待提交
+- 改动文件：[src/market_data.py](src/market_data.py) (新), [src/ai_analyzer.py](src/ai_analyzer.py), [src/main.py](src/main.py), [CLAUDE.md](CLAUDE.md), [DEVLOG.md](DEVLOG.md)
 - 163 邮箱推送已验证可用
 - 微信推送待配置 WECHAT_SENDKEY 后验证
 - GitHub Actions 待下个交易日自动触发验证
-- GitHub Pages 待仓库 Settings 中启用
 
 **待办事项：**
-- [ ] 提交 v1.2 变更并推送
-- [ ] 配置微信 SendKey 并测试微信推送
-- [ ] GitHub Pages 启用（仓库 Settings → Pages → main /docs）
-- [ ] 下个交易日验证 GitHub Actions 自动运行
+- [ ] 提交 Phase 1.1 变更
+- [ ] 下个交易日验证市场数据 API 返回真实数据
+- [ ] Phase 1.2: 次日推荐追踪
 
 ---
 
