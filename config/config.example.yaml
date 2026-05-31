@@ -1,0 +1,38 @@
+# 每日A股推荐系统 - 配置模板
+# 复制为 config.yaml 并填入真实值
+
+# AI 模型配置
+ai:
+  provider: deepseek  # deepseek | anthropic
+  model: deepseek-chat
+  max_tokens: 2000
+  temperature: 0.3  # 低温度保证输出稳定
+
+# 信息源开关（可按需关闭不稳定源）
+sources:
+  cls: false         # 财联社（API频繁变更，不稳定）
+  eastmoney: true    # 东方财富
+  xueqiu: false      # 雪球（默认关闭，需额外配置cookie）
+  sina: true         # 新浪财经
+
+# 推送配置
+push:
+  email:
+    enabled: true
+  wechat:
+    enabled: false   # 后续迭代
+  cli:
+    enabled: true
+  web:
+    enabled: true    # GitHub Pages
+
+# 爬虫配置
+scraper:
+  request_delay: 2   # 请求间隔（秒）
+  timeout: 15        # 请求超时（秒）
+  max_retries: 3     # 最大重试次数
+
+# 输出配置
+output:
+  max_recommendations: 5
+  save_raw_data: true  # 是否保存原始采集数据

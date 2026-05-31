@@ -1,0 +1,94 @@
+name: 每日A股推荐推送
+
+on:
+  schedule:
+    # 每个交易日 8:30 CST (0:30 UTC)
+    # 注意：GitHub Actions cron 使用 UTC时间
+    - cron: '30 0 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: '指定日期 (YYYY-MM-DD)，留空使用今天'
+        required: false
+        default: ''
+
+jobs:
+  daily-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 检查交易日
+        id: check_trading
+        run: |
+          python -c "
+          import akshare as ak
+          from datetime import datetime, timedelta
+          # 获取A股交易日历
+          try:
+              df = ak.tool_trade_date_hist_sina()
+              today = datetime.now().strftime('%Y-%m-%d')
+              recent = df[df['trade_date'].astype(str).str.startswith(today[:7])]
+              is_trading = today in recent['trade_date'].values
+              print(f'TRADING_DAY={is_trading}')
+              print(f'DATE={today}')
+          except Exception as e:
+              print(f'交易日检查失败: {e}，默认执行')
+              print('TRADING_DAY=true')
+              print(f'DATE={datetime.now().strftime(\"%Y-%m-%d\")}')
+          " > trading_check.txt
+          cat trading_check.txt
+          cat trading_check.txt >> $GITHUB_OUTPUT
+
+      - name: 运行推荐系统
+        if: steps.check_trading.outputs.TRADING_DAY == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_BASE_URL: ${{ secrets.DEEPSEEK_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            python -m src.main --date "${{ github.event.inputs.date }}"
+          else
+            python -m src.main
+          fi
+
+      - name: 提交网页报告
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 拉取远程docs更新
+          git pull origin main --rebase || true
+          # 添加docs目录变更
+          git add docs/ output/
+          if git diff --cached --quiet; then
+            echo "无变更"
+          else
+            git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]"
+            git push origin main
+          fi
+
+      - name: 失败告警
+        if: failure()
+        run: |
+          echo "推荐系统执行失败，请检查日志"

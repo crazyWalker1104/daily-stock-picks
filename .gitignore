@@ -1,0 +1,27 @@
+# 敏感配置
+.env
+config/config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# 输出（保留目录占位）
+output/*
+!output/.gitkeep
+
+# 数据缓存
+data/*.json
+!data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
