@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List
 
 from src.models import DailyReport
-from src.formatter import format_markdown, format_plain, format_html_page
+from src.formatter import format_markdown, format_plain, format_html_page, format_email_html
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,9 @@ class EmailPusher:
         msg["From"] = self.user
         msg["To"] = self.recipient
 
-        # 纯文本 + HTML双版本
+        # 纯文本 + 精美HTML双版本
         msg.attach(MIMEText(format_plain(report), "plain", "utf-8"))
-        msg.attach(MIMEText(body.replace("\n", "<br>\n"), "html", "utf-8"))
+        msg.attach(MIMEText(format_email_html(report), "html", "utf-8"))
 
         try:
             with smtplib.SMTP(self.host, self.port, timeout=15) as server:

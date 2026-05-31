@@ -53,6 +53,174 @@ def format_markdown(report: DailyReport) -> str:
     return "\n".join(lines)
 
 
+def format_email_html(report: DailyReport) -> str:
+    """生成精美的HTML邮件模板（方案A：现代卡片风）"""
+
+    # 信心度配色
+    CONF_COLORS = {
+        "高": {"border": "#d4380d", "bg": "#fff2f0", "badge": "#d4380d", "icon": "🔥"},
+        "中": {"border": "#d48806", "bg": "#fffbe6", "badge": "#d48806", "icon": "📈"},
+        "低": {"border": "#8c8c8c", "bg": "#fafafa", "badge": "#8c8c8c", "icon": "📌"},
+    }
+
+    # 生成推荐卡片
+    cards_html = ""
+    for i, rec in enumerate(report.recommendations, 1):
+        colors = CONF_COLORS.get(rec.confidence, CONF_COLORS["低"])
+
+        # 标的列表
+        stocks_items = ""
+        if rec.stocks:
+            for s in rec.stocks:
+                name = s.get('name', '?')
+                code = s.get('code', '??????')
+                stocks_items += f"""
+                <span style="display:inline-block;background:{colors['bg']};color:{colors['badge']};
+                    padding:3px 10px;margin:2px 4px;border-radius:3px;font-size:13px;font-weight:600;
+                    border:1px solid {colors['border']}33;">
+                    {name}<span style="color:#999;font-weight:400;">（{code}）</span>
+                </span>"""
+
+        cards_html += f"""
+        <!-- 推荐卡片 {i} -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="background:#fff;border-radius:8px;margin-bottom:16px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid {colors['border']};">
+            <tr>
+                <td style="padding:20px 24px;">
+                    <!-- 标题行 -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                            <td style="font-size:18px;font-weight:700;color:#1a1a1a;padding-bottom:4px;">
+                                {colors['icon']} {rec.sector}
+                            </td>
+                            <td align="right">
+                                <span style="display:inline-block;background:{colors['badge']};color:#fff;
+                                    padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;letter-spacing:1px;">
+                                    信心 {rec.confidence}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- 标的 -->
+                    <div style="margin:12px 0 8px;">
+                        <span style="color:#666;font-size:13px;">📌 标的关注：</span>
+                        {stocks_items}
+                    </div>
+
+                    <!-- 三项要点 -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
+                        <tr>
+                            <td width="33%" valign="top" style="padding:10px 12px;background:#f9fafb;border-radius:6px;">
+                                <div style="font-size:12px;color:#999;margin-bottom:4px;">💡 推荐逻辑</div>
+                                <div style="font-size:14px;color:#333;line-height:1.6;">{rec.logic}</div>
+                            </td>
+                            <td width="8">&nbsp;</td>
+                            <td width="33%" valign="top" style="padding:10px 12px;background:#f9fafb;border-radius:6px;">
+                                <div style="font-size:12px;color:#999;margin-bottom:4px;">⚡ 催化事件</div>
+                                <div style="font-size:14px;color:#333;line-height:1.6;">{rec.catalyst}</div>
+                            </td>
+                            <td width="8">&nbsp;</td>
+                            <td width="33%" valign="top" style="padding:10px 12px;background:#fff2f0;border-radius:6px;">
+                                <div style="font-size:12px;color:#999;margin-bottom:4px;">⚠️ 风险提示</div>
+                                <div style="font-size:14px;color:#d4380d;line-height:1.6;">{rec.risk}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>"""
+
+    # 空推荐处理
+    if not report.recommendations:
+        cards_html = """
+        <div style="text-align:center;padding:40px 20px;color:#999;">
+            <div style="font-size:48px;margin-bottom:16px;">📭</div>
+            <div style="font-size:16px;">今日暂无推荐</div>
+            <div style="font-size:13px;margin-top:8px;">可能原因：信息源异常或AI服务不可用，请稍后重试</div>
+        </div>"""
+
+    # 来源标签
+    sources_tags = "".join([
+        f'<span style="display:inline-block;background:rgba(255,255,255,0.2);padding:3px 10px;'
+        f'margin:0 4px;border-radius:3px;font-size:12px;">{s}</span>'
+        for s in report.sources_used
+    ])
+
+    # 拼装完整邮件
+    html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;">
+
+    <!-- 外层容器 -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f5f5f5;">
+        <tr>
+            <td align="center" style="padding:20px 16px;">
+
+                <!-- 内容区 600px -->
+                <table width="600" cellpadding="0" cellspacing="0" border="0"
+                    style="max-width:600px;width:100%;">
+
+                    <!-- 头部 -->
+                    <tr>
+                        <td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+                            background-color:#1a1a2e;border-radius:12px 12px 0 0;padding:32px 28px 24px;">
+                            <div style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;">
+                                📊 每日A股速递
+                            </div>
+                            <div style="font-size:15px;color:rgba(255,255,255,0.85);margin-bottom:12px;">
+                                {report.date} · {get_weekday_cn(report.date)}
+                            </div>
+                            <div style="font-size:13px;color:rgba(255,255,255,0.65);">
+                                🤖 AI综合分析 | 采集 {report.raw_news_count} 条信息 | 来源 {sources_tags}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- 主体 -->
+                    <tr>
+                        <td style="background:#fff;padding:24px 20px;">
+                            {cards_html}
+                        </td>
+                    </tr>
+
+                    <!-- 页脚 -->
+                    <tr>
+                        <td style="background:#fafafa;border-radius:0 0 12px 12px;
+                            padding:20px 28px;border-top:1px solid #eee;">
+                            <div style="font-size:13px;color:#999;line-height:1.8;">
+                                ⚠️ <strong>免责声明</strong>：以上内容由AI自动生成，仅供学习参考和技术交流，
+                                <span style="color:#d4380d;">不构成任何投资建议</span>。
+                                股市有风险，投资需谨慎。请勿据此进行交易决策。
+                            </div>
+                            <div style="font-size:12px;color:#bbb;margin-top:8px;">
+                                生成时间：{report.generated_at[:19]}
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+
+                <!-- 底部署名 -->
+                <div style="margin-top:16px;font-size:12px;color:#ccc;text-align:center;">
+                    每日A股智能推荐系统 · Powered by DeepSeek AI
+                </div>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>"""
+
+    return html
+
+
 def format_plain(report: DailyReport) -> str:
     """生成纯文本格式（用于CLI输出）"""
     date_str = report.date
