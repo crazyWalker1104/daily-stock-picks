@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List
 
 from src.models import Recommendation, DailyReport
+from src.tracker import format_tracking_section, format_tracking_plain
 
 
 def format_markdown(report: DailyReport) -> str:
@@ -45,6 +46,12 @@ def format_markdown(report: DailyReport) -> str:
             lines.append("")
             lines.append("---")
             lines.append("")
+
+    # 昨日推荐回顾
+    tracking_text = format_tracking_section(report.tracking)
+    if tracking_text:
+        lines.append(tracking_text)
+        lines.append("")
 
     # 页脚
     lines.append(f"> ⚠️ 免责声明：以上内容由AI自动生成，仅供学习参考，不构成投资建议。投资有风险，入市需谨慎。")
@@ -132,6 +139,53 @@ def format_email_html(report: DailyReport) -> str:
             </tr>
         </table>"""
 
+    # 昨日推荐回顾区块（HTML）
+    tracking_html = ""
+    if report.tracking and report.tracking.get("stocks"):
+        t = report.tracking
+        t_rows = ""
+        for s in t["stocks"]:
+            t_emoji = "✅" if s.get("hit") else ("❌" if s.get("change_pct") is not None else "➖")
+            t_perf = f"{s['change_pct']:+.2f}%" if s.get("change_pct") is not None else "—"
+            t_color = "#cf1322" if (s.get("change_pct") or 0) > 0 else ("#d4380d" if (s.get("change_pct") or 0) <= 0 else "#999")
+            t_rows += f"""
+                    <tr style="border-bottom:1px solid #f0f0f0;">
+                        <td style="padding:8px 12px;font-size:13px;">{t_emoji}</td>
+                        <td style="padding:8px 12px;font-size:13px;font-weight:600;">{s['name']}<span style="color:#999;font-weight:400;">（{s['code']}）</span></td>
+                        <td style="padding:8px 12px;font-size:13px;color:#666;">{s['sector']}</td>
+                        <td style="padding:8px 12px;font-size:13px;color:#666;">{s['confidence']}</td>
+                        <td style="padding:8px 12px;font-size:13px;color:{t_color};font-weight:600;">{t_perf}</td>
+                    </tr>"""
+
+        tracking_html = f"""
+        <!-- 昨日推荐回顾 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="background:#fff;border-radius:8px;margin-top:16px;margin-bottom:16px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <tr>
+                <td style="padding:20px 24px;">
+                    <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:12px;">
+                        📊 昨日推荐回顾 ({t['prev_date']})
+                    </div>
+                    <div style="font-size:13px;color:#666;margin-bottom:12px;">
+                        胜率 <strong>{t['hit_rate']:.0%}</strong> &nbsp;|&nbsp;
+                        均收益 <strong style="color:{'#cf1322' if t['avg_return'] > 0 else '#d4380d'};">{t['avg_return']:+.2f}%</strong> &nbsp;|&nbsp;
+                        {t['hit_count']}涨 / {t['miss_count']}跌
+                    </div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr style="background:#fafafa;">
+                            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#999;"></th>
+                            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#999;">标的</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#999;">板块</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#999;">信心</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#999;">今日表现</th>
+                        </tr>
+                        {t_rows}
+                    </table>
+                </td>
+            </tr>
+        </table>"""
+
     # 空推荐处理
     if not report.recommendations:
         cards_html = """
@@ -186,6 +240,7 @@ def format_email_html(report: DailyReport) -> str:
                     <tr>
                         <td style="background:#fff;padding:24px 20px;">
                             {cards_html}
+                            {tracking_html}
                         </td>
                     </tr>
 
@@ -250,6 +305,11 @@ def format_plain(report: DailyReport) -> str:
             lines.append(f"   催化: {rec.catalyst[:60]}")
             lines.append(f"   风险: {rec.risk[:60]}")
             lines.append("")
+
+    # 昨日推荐回顾
+    tracking_text = format_tracking_plain(report.tracking)
+    if tracking_text:
+        lines.append(tracking_text)
 
     lines.append(f"─── {report.generated_at[:19]}")
     lines.append("⚠️ AI生成，仅供参考，不构成投资建议")

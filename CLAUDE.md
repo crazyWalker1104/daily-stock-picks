@@ -35,6 +35,7 @@ pip install -r requirements.txt
 | **市场数据** | [src/market_data.py](src/market_data.py) | 指数/资金流实时采集 + Prompt格式化注入 | 新增数据维度时 |
 | **数据模型** | [src/models.py](src/models.py) | NewsItem / Recommendation / DailyReport 定义 | 新增数据字段时 |
 | **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
+| **追踪器** | [src/tracker.py](src/tracker.py) | 昨日推荐vs今日行情对比，胜率/均收益统计 | 新增追踪维度时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
 | **格式化** | [src/formatter.py](src/formatter.py) | Markdown/纯文本/HTML邮件/HTML网页 四种输出 | 改模板样式时 |
 | **推送模块** | [src/pusher.py](src/pusher.py) | BasePusher + 4通道 + 注册表 + Pusher管理器 | 新增推送通道时 |
@@ -60,6 +61,8 @@ Daily Stock Picks/
 │   ├── main.py              # 主入口，编排三阶段流程
 │   ├── models.py            # 数据模型：NewsItem, Recommendation, DailyReport
 │   ├── aggregator.py        # 聚合器：去重 → 关键词打分 → 排序截断
+│   ├── market_data.py       # 市场数据：指数/资金流实时采集 + Prompt注入
+│   ├── tracker.py           # 追踪器：昨日推荐vs今日表现对比反馈
 │   ├── ai_analyzer.py       # AI分析：DeepSeek API 调用 + Prompt 管理
 │   ├── formatter.py         # 格式化：Markdown / 纯文本 / 邮件HTML / 网页HTML
 │   ├── pusher.py            # 推送：BasePusher基类 + 4通道 + PUSHER_REGISTRY
@@ -159,6 +162,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-01 | v1.4 | Phase 1.2 次日追踪：src/tracker.py（推荐回顾+胜率统计）+ report.tracking字段 + 三种输出格式回顾区块 |
 | 2026-05-31 | v1.3 | Phase 1.1 市场数据注入：src/market_data.py（指数+资金流+成交额）+ 文档体系（DEVLOG + CLAUDE.md路径索引） |
 | 2026-05-31 | v1.2 | 推送模块重构：BasePusher抽象基类 + 通道注册表 + 微信推送(Server酱) + 163邮箱支持(SSL) + CLI `--push` 通道选择 |
 | 2026-05-31 | v1.1 | 邮件HTML模板升级为现代卡片风（渐变头部 + 三栏网格 + 信心度色标） |

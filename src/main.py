@@ -20,6 +20,7 @@ from src.scrapers import collect_all_news
 from src.aggregator import aggregate
 from src.ai_analyzer import AIAnalyzer
 from src.market_data import get_market_context
+from src.tracker import track_yesterday
 from src.pusher import Pusher
 
 # 日志配置
@@ -83,6 +84,11 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
     news_text = aggregate(all_news, max_for_ai=40)
     analyzer = AIAnalyzer(config)
     report = analyzer.analyze(news_text, date, market_context=market_context)
+
+    # Phase 2.5: 昨日推荐追踪
+    tracking = track_yesterday(date)
+    if tracking:
+        report.tracking = tracking
 
     # 保存报告JSON
     report_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output", f"{date}_report.json")

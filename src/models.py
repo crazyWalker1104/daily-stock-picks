@@ -42,6 +42,7 @@ class DailyReport:
     recommendations: list  # List[Recommendation]
     raw_news_count: int    # 原始采集新闻数
     sources_used: list     # 本次使用的信息源
+    tracking: dict = field(default_factory=dict)  # 昨日推荐追踪结果（tracker模块填充）
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
@@ -50,5 +51,6 @@ class DailyReport:
             "recommendations": [r.to_dict() for r in self.recommendations],
             "raw_news_count": self.raw_news_count,
             "sources_used": self.sources_used,
+            "tracking": self.tracking,
             "generated_at": self.generated_at
         }
