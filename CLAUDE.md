@@ -32,7 +32,7 @@ pip install -r requirements.txt
 | **开发日志** | [DEVLOG.md](DEVLOG.md) | 每日开发记录、路线图、待办池 | 每次开发会话更新 |
 | **README** | [README.md](README.md) | 面向用户的说明文档 | 版本发布时更新 |
 | **主入口** | [src/main.py](src/main.py) | CLI参数解析、三阶段编排、入口函数 | 新增通道/参数时 |
-| **市场数据** | [src/market_data.py](src/market_data.py) | 指数/资金流实时采集 + Prompt格式化注入 | 新增数据维度时 |
+| **市场数据** | [src/market_data.py](src/market_data.py) | 三层数据源（实时API+akshare增强+历史）+ Prompt格式化注入 | 新增数据维度时 |
 | **数据模型** | [src/models.py](src/models.py) | NewsItem / Recommendation / DailyReport 定义 | 新增数据字段时 |
 | **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
 | **追踪器** | [src/tracker.py](src/tracker.py) | 昨日推荐vs今日行情对比，胜率/均收益统计 | 新增追踪维度时 |
@@ -162,6 +162,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-01 | v1.5 | Phase 1.3: akshare增强行情（北向资金+主力趋势+板块排名分层架构） |
 | 2026-06-01 | v1.4 | Phase 1.2 次日追踪：src/tracker.py（推荐回顾+胜率统计）+ report.tracking字段 + 三种输出格式回顾区块 |
 | 2026-05-31 | v1.3 | Phase 1.1 市场数据注入：src/market_data.py（指数+资金流+成交额）+ 文档体系（DEVLOG + CLAUDE.md路径索引） |
 | 2026-05-31 | v1.2 | 推送模块重构：BasePusher抽象基类 + 通道注册表 + 微信推送(Server酱) + 163邮箱支持(SSL) + CLI `--push` 通道选择 |
@@ -172,13 +173,12 @@ Daily Stock Picks/
 
 | 模块 | 状态 | 备注 |
 |------|------|------|
-| 东方财富 | ✅ 稳定 | 研报数据源，实测30条/次 |
-| 新浪财经 | ✅ 稳定 | 要闻，实测31条/次 |
-| 财联社 | ⚠️ 关闭 | API接口404，需更新endpoint |
-| 雪球 | 📦 关闭 | 需配置cookie后启用 |
+| 市场数据(实时) | ✅ 就绪 | 东方财富 push2 API：指数+板块资金流+成交额 |
+| 市场数据(增强) | ✅ 新增 | akshare：北向资金+主力趋势+板块排名 |
+| 次日追踪 | ✅ 就绪 | 昨日推荐vs今日行情对比，胜率统计 |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
 | QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
-| 163邮箱推送 | ✅ 新增 | SMTP 465/SSL，授权码登录 |
+| 163邮箱推送 | ✅ 就绪 | SMTP 465/SSL，授权码登录 |
 | 微信推送 | ✅ 新增 | Server酱 (sct.ftqq.com)，需 WECHAT_SENDKEY |
 | 通道选择 | ✅ 新增 | YAML `enabled` 或 CLI `--push email,wechat,...` |
 | GitHub Actions | ⚠️ 待验证 | 代码已推送，Secrets已配置，待交易日自动触发验证 |
@@ -198,4 +198,5 @@ Daily Stock Picks/
 **当前优先事项（P0）：**
 - [ ] GitHub Actions 首跑验证 — 下个交易日确认
 - [ ] GitHub Pages 启用 — 仓库 Settings → Pages → main /docs
-- [ ] 安装 akshare，开始 Phase 1.1 市场数据注入
+- [x] Phase 1.1-1.3 完成：市场数据 + 追踪 + akshare增强
+- [ ] Phase 2.1: 资金流向×新闻情绪双重确认引擎

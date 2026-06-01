@@ -30,7 +30,7 @@
 |:---|:---|:---|:---|:---|:---|
 | 1.1 | 市场实况数据注入 — AI Prompt 增加结构化行情数据 | ✅ | P0 | ~150 | — |
 | 1.2 | 次日推荐追踪 — 自动对比昨日推荐 vs 今日涨跌 | ✅ | P0 | ~200 | — |
-| 1.3 | 依赖升级 — 安装 akshare，获取个股K线/北向资金 | ⏳ | P0 | ~10 | — |
+| 1.3 | 依赖升级 — 安装 akshare，获取个股K线/北向资金 | ✅ | P0 | ~10 | — |
 | 1.4 | `requirements.txt` 补全 akshare | ✅ | P1 | ~1 | 1.3 |
 
 ### Phase 2：量化因子引入 `计划 2026-06-08 ~ 2026-06-14`
@@ -101,7 +101,7 @@
 
 ---
 
-### 2026-06-01 (周日) — v1.4
+### 2026-06-01 (周一) — v1.5
 
 **完成事项：**
 - 🚀 **Phase 1.2 完成**：新增 [src/tracker.py](src/tracker.py) 次日推荐追踪模块
@@ -109,18 +109,28 @@
   - 批量获取个股实时行情（东方财富API）
   - 计算胜率、均收益、涨跌统计
   - 三种输出格式（Markdown/纯文本/HTML邮件）均追加回顾区块
+- 🚀 **Phase 1.3 完成**：akshare 增强行情数据模块
+  - 新增 `fetch_north_bound_flow()` — 北向资金（沪深港通）当日流向，支持 akshare + 直接API双通道
+  - 新增 `fetch_market_flow_trend()` — 近5日主力资金流向趋势（主力态度判断：偏多/偏空/中性）
+  - 新增 `fetch_sector_rank_ak()` — 行业+概念板块资金排名（akshare，作为Layer1实时API的补充）
+  - 数据源分层架构：Layer1 实时(push2 API) + Layer2 增强(akshare) + Layer3 历史(后续)
+  - 北向资金格式化注入AI Prompt（外资动向+方向判断）
+  - 主力资金趋势注入AI Prompt（近5日每日明细+态度总结）
+  - 概念板块排名作为实时API的fallback数据源
+  - akshare 懒加载机制，未安装时不影响其他模块
 - 🔧 [src/models.py](src/models.py)：DailyReport 新增 `tracking` 字段
 - 🔧 [src/formatter.py](src/formatter.py)：format_markdown/format_plain/format_email_html 均增加回顾区块
 - 📝 更新 [README.md](README.md)：补全功能列表、项目结构、邮箱/微信配置说明
 - 📝 更新 [CLAUDE.md](CLAUDE.md)：文件索引新增 tracker.py，版本更新 v1.4
 
 **遇到的问题：**
-- 周日/非交易日个股行情API返回空 — 追踪模块优雅降级，显示"无数据"
-- 连续API请求偶发连接断开 — market_data.py 加了 0.5s 间隔缓解
+- 东方财富 push2 API 盘前大面积 `RemoteDisconnected`（指数/板块/个股行情全部断连）— 仅北向资金(akshare)成功
+- 确认盘前(9:00-9:30)是API薄弱窗口期，9:30开盘后应恢复
+- akshare 的 `stock_sector_fund_flow_rank` 和 `stock_market_fund_flow` 底层也走东方财富，同样受盘前影响
 
 **待办事项：**
-- [ ] 交易日期待验证个股行情API + 追踪数据完整性
-- [ ] Phase 1.3: 安装 akshare + 增强行情数据
+- [ ] 9:30开盘后验证所有行情API真实数据
+- [ ] Phase 2.1: 资金流向×新闻情绪双重确认引擎
 
 ---
 
@@ -156,6 +166,7 @@
 
 | 版本 | 日期 | 关键变更 |
 |:---|:---|:---|
+| v1.5 | 2026-06-01 | Phase 1.3: akshare增强行情（北向资金+主力趋势+板块排名） |
 | v1.4 | 2026-06-01 | Phase 1.2: 次日追踪模块（回顾+胜率）+ README补全 |
 | v1.3 | 2026-05-31 | Phase 1.1: 市场实况数据注入 + DEVLOG开发日志 + CLAUDE.md路径索引 |
 | v1.2 | 2026-05-31 | BasePusher抽象基类 + 微信推送 + 163邮箱 + 通道选择 |
