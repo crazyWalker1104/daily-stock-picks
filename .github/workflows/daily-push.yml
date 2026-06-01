@@ -37,10 +37,9 @@ jobs:
         id: check_trading
         run: |
           python -c "
-          import akshare as ak
-          from datetime import datetime, timedelta
-          # 获取A股交易日历
+          from datetime import datetime
           try:
+              import akshare as ak
               df = ak.tool_trade_date_hist_sina()
               today = datetime.now().strftime('%Y-%m-%d')
               recent = df[df['trade_date'].astype(str).str.startswith(today[:7])]
