@@ -134,6 +134,26 @@
 
 ---
 
+### 2026-06-02 (周二) — v1.5.1
+
+**完成事项：**
+- 🐛 **修复 GitHub Actions 交易日检查双重 Bug（根因：CI从未真正运行过）**
+  - Bug 1 (类型不匹配): `today in recent['trade_date'].values` — str vs numpy.datetime64 永远返回 False
+  - Bug 2 (大小写): Python `print(f"{True}")` → `"True"`（大写），GHA 条件检查小写 `'true'`
+  - 讽刺的是：之前能"运行"是因为 akshare 未安装时抛异常进了 except 分支（硬编码 `true`）
+- 🐛 **修复 market_data.py push2 网络问题**
+  - `push2.eastmoney.com`（IP 61.129.129.196）从当前网络环境完全不通
+  - 指数行情改用 **Sina API** (`hq.sinajs.cn`) — 稳定、无频率限制、三大指数全覆盖
+- 🔧 新增 `permissions.contents: write` — 修复 git push 权限问题
+
+**待办事项：**
+- [ ] 等待明日(6/3 周三)8:30 自动触发验证
+- [ ] 板块资金流/成交额需要替代数据源（push2 被墙）
+- [ ] 追踪模块个股行情（也依赖 push2）需要替代方案
+- [ ] 财联社爬虫修复
+
+---
+
 ### 模板：YYYY-MM-DD (周X) — vX.X
 
 **完成事项：**
