@@ -35,11 +35,14 @@ def _get_ak():
     return _ak if _ak is not False else None
 
 # ── 东方财富实时行情API ──────────────────────────────────────────
+# 注：push2.eastmoney.com 在某些网络环境下被屏蔽，使用 push2his 作为替代
+# push2his 功能完全相同，但需要注意频率限制（建议请求间隔 >= 3秒）
 
-INDEX_API = "https://push2.eastmoney.com/api/qt/ulist.np/get"
-SECTOR_FLOW_API = "https://push2.eastmoney.com/api/qt/clist/get"
-# 北向资金（沪深港通）
-NORTH_BOUND_API = "https://push2.eastmoney.com/api/qt/kamt.kline/get"
+_EASTMONEY_BASE = "https://push2his.eastmoney.com"
+INDEX_API = f"{_EASTMONEY_BASE}/api/qt/ulist.np/get"
+SECTOR_FLOW_API = f"{_EASTMONEY_BASE}/api/qt/clist/get"
+NORTH_BOUND_API = f"{_EASTMONEY_BASE}/api/qt/kamt.kline/get"
+MARKET_STAT_API = f"{_EASTMONEY_BASE}/api/qt/ulist.np/get"
 
 # 三大指数 secid
 INDEX_IDS = [
@@ -47,9 +50,6 @@ INDEX_IDS = [
     "0.399001",   # 深证成指
     "0.399006",   # 创业板指
 ]
-
-# 大盘统计
-MARKET_STAT_API = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 
 
 def _get_headers() -> dict:
@@ -60,36 +60,92 @@ def _get_headers() -> dict:
 
 
 def fetch_index_data() -> List[dict]:
-    """获取三大指数实时行情
+    """获取三大指数实时行情（Sina API 主力 + push2/akshare 兜底）
+
+    注：Sina API 稳定、无频率限制，支持三大指数全覆盖。
 
     Returns:
         [{"name": "上证指数", "code": "000001", "price": 3245.12,
           "change_pct": 0.37, "change_amt": 12.05}, ...]
     """
-    params = {
-        "fltt": "2",
-        "fields": "f2,f3,f4,f12,f14",  # 最新价,涨跌幅,涨跌额,代码,名称
-        "secids": ",".join(INDEX_IDS),
-        "invt": "2",
+    # 主数据源：Sina Finance API（最稳定）
+    result = _fetch_index_from_sina()
+    if result:
+        return result
+
+    # 兜底1：push2 API
+    result = _fetch_index_from_push()
+    if result:
+        return result
+
+    # 兜底2：akshare（使用非 push2 API）
+    return _fetch_index_from_akshare()
+
+
+def _fetch_index_from_sina() -> List[dict]:
+    """从 Sina 财经 API 获取三大指数"""
+    sina_codes = {
+        "s_sh000001": "000001",  # 上证指数
+        "s_sz399001": "399001",  # 深证成指
+        "s_sz399006": "399006",  # 创业板指
     }
     try:
-        resp = requests.get(INDEX_API, params=params, headers=_get_headers(), timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        items = data.get("data", {}).get("diff", []) or []
+        url = "https://hq.sinajs.cn/list=" + ",".join(sina_codes.keys())
+        headers = {"Referer": "https://finance.sina.com.cn",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.encoding = "gbk"
+        text = resp.text
+
         result = []
-        for item in items:
-            result.append({
-                "name": item.get("f14", ""),
-                "code": item.get("f12", ""),
-                "price": item.get("f2", 0),
-                "change_pct": item.get("f3", 0),    # 涨跌幅 %
-                "change_amt": item.get("f4", 0),    # 涨跌额
-            })
-        logger.info(f"指数数据获取成功: {len(result)} 条")
+        for sina_key, code in sina_codes.items():
+            # Sina返回格式: var hq_str_KEY="名称,价格,涨跌额,涨跌幅,成交量,成交额";
+            for line in text.split("\n"):
+                if sina_key in line:
+                    parts = line.split('"')[1].split(",") if '"' in line else []
+                    if len(parts) >= 4:
+                        result.append({
+                            "name": parts[0],
+                            "code": code,
+                            "price": float(parts[1]),
+                            "change_pct": float(parts[3]),
+                            "change_amt": float(parts[2]),
+                        })
+                    break
+        if result:
+            logger.info(f"指数数据获取成功(Sina): {len(result)} 条")
         return result
     except Exception as e:
-        logger.warning(f"指数数据获取失败: {e}")
+        logger.warning(f"指数数据(Sina)获取失败: {e}")
+        return []
+
+
+def _fetch_index_from_akshare() -> List[dict]:
+    """从 akshare 获取指数行情（兜底方案）"""
+    ak = _get_ak()
+    if not ak:
+        return []
+    try:
+        df = ak.stock_zh_index_spot_em()
+        if df.empty:
+            return []
+        result = []
+        name_map = {"上证指数": "000001", "深证成指": "399001", "创业板指": "399006"}
+        for _, row in df.iterrows():
+            name = str(row.get("名称", ""))
+            if name in name_map:
+                result.append({
+                    "name": name,
+                    "code": name_map[name],
+                    "price": float(row.get("最新价", 0) or 0),
+                    "change_pct": float(row.get("涨跌幅", 0) or 0),
+                    "change_amt": float(row.get("涨跌额", 0) or 0),
+                })
+        if result:
+            logger.info(f"指数数据获取成功(akshare): {len(result)} 条")
+        return result
+    except Exception as e:
+        logger.warning(f"指数数据(akshare)失败: {e}")
         return []
 
 
@@ -232,7 +288,7 @@ def fetch_north_bound_flow() -> dict:
             "lmt": "0", "klt": "1", "fields1": "f1,f3",
             "fields2": "f51,f52", "ut": "b2884a393a59ad64002292a3e90d46a5",
         }
-        resp = requests.get("https://push2.eastmoney.com/api/qt/kamt.kline/get",
+        resp = requests.get(NORTH_BOUND_API,
                            params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -382,19 +438,19 @@ def collect_market_data() -> dict:
     """
     logger.info("开始采集市场实况数据...")
 
-    # Layer 1: 东方财富直接API（低延迟）
+    # Layer 1: 东方财富直接API（低延迟，注意频率限制）
     indices = fetch_index_data()
-    time.sleep(0.3)
+    time.sleep(2)
     sector_flow = fetch_sector_flow(top_n=5)
-    time.sleep(0.3)
+    time.sleep(2)
     market_stat = fetch_market_stat()
-    time.sleep(0.3)
+    time.sleep(2)
 
     # Layer 2: akshare 增强数据
     north_bound = fetch_north_bound_flow()
-    time.sleep(0.3)
+    time.sleep(1)
     flow_trend = fetch_market_flow_trend(days=5)
-    time.sleep(0.3)
+    time.sleep(1)
     sector_rank_ak = fetch_sector_rank_ak(top_n=10)
 
     result = {
