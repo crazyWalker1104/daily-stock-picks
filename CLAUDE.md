@@ -36,6 +36,7 @@ pip install -r requirements.txt
 | **数据模型** | [src/models.py](src/models.py) | NewsItem / Recommendation / DailyReport 定义 | 新增数据字段时 |
 | **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
 | **追踪器** | [src/tracker.py](src/tracker.py) | 昨日推荐vs今日行情对比，胜率/均收益统计 | 新增追踪维度时 |
+| **确认引擎** | [src/confirmation.py](src/confirmation.py) | 资金流向×新闻情绪双重确认，信心度调整（Phase 2.1） | 调整确认逻辑时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
 | **格式化** | [src/formatter.py](src/formatter.py) | Markdown/纯文本/HTML邮件/HTML网页 四种输出 | 改模板样式时 |
 | **推送模块** | [src/pusher.py](src/pusher.py) | BasePusher + 4通道 + 注册表 + Pusher管理器 | 新增推送通道时 |
@@ -162,6 +163,8 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-02 | v1.6 | Phase 2.1: 双重确认引擎（资金流向×新闻情绪交叉验证+信心度调整） |
+| 2026-06-02 | v1.5.1 | BugFix: GitHub Actions 交易日检查双重Bug + market_data push2→Sina API |
 | 2026-06-01 | v1.5 | Phase 1.3: akshare增强行情（北向资金+主力趋势+板块排名分层架构） |
 | 2026-06-01 | v1.4 | Phase 1.2 次日追踪：src/tracker.py（推荐回顾+胜率统计）+ report.tracking字段 + 三种输出格式回顾区块 |
 | 2026-05-31 | v1.3 | Phase 1.1 市场数据注入：src/market_data.py（指数+资金流+成交额）+ 文档体系（DEVLOG + CLAUDE.md路径索引） |

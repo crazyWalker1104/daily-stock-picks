@@ -19,9 +19,10 @@ import yaml
 from src.scrapers import collect_all_news
 from src.aggregator import aggregate
 from src.ai_analyzer import AIAnalyzer
-from src.market_data import get_market_context
+from src.market_data import collect_market_data, format_market_overview
 from src.tracker import track_yesterday
 from src.pusher import Pusher
+from src.confirmation import confirm_recommendations, get_engine
 
 # 日志配置
 logging.basicConfig(
@@ -78,12 +79,25 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
 
     # Phase 2: 聚合 + 市场数据 + AI分析
     logger.info("Phase 2: 采集市场数据...")
-    market_context = get_market_context()
+    market_data = collect_market_data()
+    from src.market_data import format_market_overview
+    market_context = format_market_overview(market_data)
 
     logger.info("Phase 2: AI分析...")
     news_text = aggregate(all_news, max_for_ai=40)
     analyzer = AIAnalyzer(config)
     report = analyzer.analyze(news_text, date, market_context=market_context)
+
+    # Phase 2.1: 双重确认引擎 — 资金流向×新闻情绪交叉验证
+    if report.recommendations:
+        logger.info("Phase 2.1: 双重确认引擎验证...")
+        confirmed_recs = confirm_recommendations(
+            report.recommendations, market_data, all_news
+        )
+        report.recommendations = confirmed_recs
+        # 生成确认摘要（注入 report 供格式化使用）
+        engine = get_engine()
+        report.confirmation_summary = engine.get_summary(confirmed_recs)  # type: ignore
 
     # Phase 2.5: 昨日推荐追踪
     tracking = track_yesterday(date)

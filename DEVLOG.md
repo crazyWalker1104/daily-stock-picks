@@ -39,7 +39,7 @@
 
 | # | 任务 | 状态 | 优先级 | 依赖 |
 |:---|:---|:---|:---|:---|
-| 2.1 | 资金流向×新闻情绪双重确认引擎 | ⏳ | P0 | Phase 1 |
+| 2.1 | 资金流向×新闻情绪双重确认引擎 | ✅ | P0 | Phase 1 |
 | 2.2 | 推荐后处理：技术面过滤（涨幅/量能/均线） | ⏳ | P0 | 1.3 |
 | 2.3 | 聚合器重构：多因子打分替换纯关键词匹配 | ⏳ | P1 | 2.1 |
 
@@ -134,22 +134,35 @@
 
 ---
 
-### 2026-06-02 (周二) — v1.5.1
+### 2026-06-02 (周二) — v1.6
 
 **完成事项：**
-- 🐛 **修复 GitHub Actions 交易日检查双重 Bug（根因：CI从未真正运行过）**
-  - Bug 1 (类型不匹配): `today in recent['trade_date'].values` — str vs numpy.datetime64 永远返回 False
-  - Bug 2 (大小写): Python `print(f"{True}")` → `"True"`（大写），GHA 条件检查小写 `'true'`
-  - 讽刺的是：之前能"运行"是因为 akshare 未安装时抛异常进了 except 分支（硬编码 `true`）
-- 🐛 **修复 market_data.py push2 网络问题**
-  - `push2.eastmoney.com`（IP 61.129.129.196）从当前网络环境完全不通
-  - 指数行情改用 **Sina API** (`hq.sinajs.cn`) — 稳定、无频率限制、三大指数全覆盖
-- 🔧 新增 `permissions.contents: write` — 修复 git push 权限问题
+- 🚀 **Phase 2.1 完成**：新增 [src/confirmation.py](src/confirmation.py) 双重确认引擎
+  - `DualConfirmationEngine` 类：资金流向×新闻情绪交叉验证
+  - 北向资金信号提取（5级方向+强度分类：strong/moderate/weak inflow/outflow/neutral）
+  - 板块级新闻情绪分析（正/负面信号词典 + 模糊板块关键词匹配）
+  - 4种对齐判断：confirmed_bullish / confirmed_bearish / divergent / uncertain
+  - 信心度自动调整（双确认→+1级，背离→-1级，不确定→不变）
+  - 异常风险标注（背离警告自动注入 risk 字段）
+  - Markdown/HTML邮件/纯文本 三种格式均追加确认摘要区块
+- 🐛 **修复 GitHub Actions 交易日检查双重 Bug**（v1.5.1）
+- 🐛 **修复 market_data.py push2.eastmoney.com 被墙问题**：指数行情改用 Sina API
+- 🔧 `main.py`：消除 `collect_market_data()` 重复调用（节省 ~20s）
+- 📝 更新 DEVLOG.md 路线图 Phase 2.1 标记完成
+
+**遇到的问题：**
+- 北向资金盘初数据为 0（中性），导致确认引擎对所有推荐输出 uncertain — 数据驱动下这是正确的保守行为，盘中有方向性数据后会触发确认/背离判断
+- `push2.eastmoney.com` 完全被墙影响板块资金流、个股行情等多个模块，需要找替代数据源
+
+**验证结果：**
+- 6/1 推荐追踪：5/5 全涨，均收益 **+4.25%** 🎉（软通动力+7.34%、巨化股份+4.85%、天孚通信+4.41%）
+- 确认引擎成功检测到板块级新闻情绪（AI算力 5+/11条、有色金属 2+/4条）
+- AI 推荐 + 确认引擎 + 追踪 全管道串通
 
 **待办事项：**
-- [ ] 等待明日(6/3 周三)8:30 自动触发验证
-- [ ] 板块资金流/成交额需要替代数据源（push2 被墙）
-- [ ] 追踪模块个股行情（也依赖 push2）需要替代方案
+- [ ] 等待明日(6/3 周三)8:30 GitHub Actions 自动触发验证
+- [ ] Phase 2.2: 技术面过滤（涨幅/量能/均线）
+- [ ] 推送通道确认（用户反馈邮件接收情况）
 - [ ] 财联社爬虫修复
 
 ---

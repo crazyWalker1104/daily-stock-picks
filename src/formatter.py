@@ -47,6 +47,11 @@ def format_markdown(report: DailyReport) -> str:
             lines.append("---")
             lines.append("")
 
+    # 双重确认引擎验证摘要（Phase 2.1）
+    if hasattr(report, "confirmation_summary") and report.confirmation_summary:
+        lines.append(report.confirmation_summary)
+        lines.append("")
+
     # 昨日推荐回顾
     tracking_text = format_tracking_section(report.tracking)
     if tracking_text:
@@ -135,6 +140,34 @@ def format_email_html(report: DailyReport) -> str:
                             </td>
                         </tr>
                     </table>
+                </td>
+            </tr>
+        </table>"""
+
+    # 双重确认引擎验证摘要（Phase 2.1）
+    confirmation_html = ""
+    if hasattr(report, "confirmation_summary") and report.confirmation_summary:
+        # 将 Markdown 格式的确认摘要转简单 HTML
+        conf_lines = report.confirmation_summary.strip().split("\n")
+        conf_body = ""
+        for line in conf_lines:
+            if line.startswith("## "):
+                conf_body += f'<div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:12px;">{line[3:]}</div>'
+            elif line.startswith("**"):
+                conf_body += f'<p style="font-size:14px;color:#333;margin:8px 0;">{line}</p>'
+            elif line.strip().startswith(("🟢", "🔴", "⚠️", "❓")):
+                conf_body += f'<p style="font-size:14px;color:#555;margin:4px 0 4px 16px;">{line.strip()}</p>'
+            elif line.strip():
+                conf_body += f'<p style="font-size:14px;color:#666;margin:4px 0;">{line.strip()}</p>'
+
+        confirmation_html = f"""
+        <!-- 双重确认引擎验证 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="background:#f6ffed;border-radius:8px;margin-top:16px;margin-bottom:16px;
+            border:1px solid #b7eb8f;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+            <tr>
+                <td style="padding:20px 24px;">
+                    {conf_body}
                 </td>
             </tr>
         </table>"""
@@ -240,6 +273,7 @@ def format_email_html(report: DailyReport) -> str:
                     <tr>
                         <td style="background:#fff;padding:24px 20px;">
                             {cards_html}
+                            {confirmation_html}
                             {tracking_html}
                         </td>
                     </tr>
@@ -305,6 +339,11 @@ def format_plain(report: DailyReport) -> str:
             lines.append(f"   催化: {rec.catalyst[:60]}")
             lines.append(f"   风险: {rec.risk[:60]}")
             lines.append("")
+
+    # 双重确认引擎验证摘要（Phase 2.1）
+    if hasattr(report, "confirmation_summary") and report.confirmation_summary:
+        lines.append(report.confirmation_summary)
+        lines.append("")
 
     # 昨日推荐回顾
     tracking_text = format_tracking_plain(report.tracking)
