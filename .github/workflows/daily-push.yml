@@ -85,15 +85,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 拉取远程docs更新
-          git pull origin main --rebase || true
-          # 添加docs目录变更
+
+          # 拉取远程最新代码并 rebase 本地提交
+          git fetch origin main
+          git rebase origin/main || git rebase --abort
+
+          # 添加 docs 和 output 目录变更
           git add docs/ output/
+
           if git diff --cached --quiet; then
-            echo "无变更"
+            echo "无变更，跳过提交"
           else
-            git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]"
-            git push origin main
+            git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || {
+              echo "提交失败，检查是否有变更"
+              exit 1
+            }
+            git push origin main || {
+              echo "推送失败，尝试重新拉取"
+              git pull --rebase origin main
+              git push origin main
+            }
           fi
 
       - name: 失败告警
