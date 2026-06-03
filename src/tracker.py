@@ -217,14 +217,7 @@ def track_yesterday(current_date: str, output_dir: str = "output") -> Optional[d
 
 
 def format_tracking_section(tracking: Optional[dict]) -> str:
-    """将追踪数据格式化为报告追加段落（Markdown）
-
-    Args:
-        tracking: track_yesterday() 的返回结果
-
-    Returns:
-        Markdown 文本块
-    """
+    """将追踪数据格式化为报告追加段落（Markdown，紧凑表格式）"""
     if not tracking or not tracking.get("stocks"):
         return ""
 
@@ -234,37 +227,26 @@ def format_tracking_section(tracking: Optional[dict]) -> str:
     lines.append(f"## 📊 昨日推荐回顾 ({tracking['prev_date']})")
     lines.append("")
 
-    # 汇总
+    # 汇总一行
     if tracking["total_count"] > 0:
         lines.append(
-            f"| 胜率 | 均收益 | 上涨 | 下跌 |"
-        )
-        lines.append(
-            f"|:---:|:---:|:---:|:---:|"
-        )
-        lines.append(
-            f"| {tracking['hit_rate']:.0%} | {tracking['avg_return']:+.2f}% "
-            f"| {tracking['hit_count']} | {tracking['miss_count']} |"
+            f"**胜率 {tracking['hit_rate']:.0%}** · "
+            f"均收益 **{tracking['avg_return']:+.2f}%** · "
+            f"{tracking['hit_count']}涨 / {tracking['miss_count']}跌"
         )
         lines.append("")
 
-    # 明细
+    # 表格式明细
+    lines.append("| | 标的 | 板块 | 信心 | 今日 |")
+    lines.append("|:---:|:---|:---|:---:|---:|")
     for s in tracking["stocks"]:
         emoji = "✅" if s.get("hit") else ("❌" if s.get("change_pct") is not None else "➖")
-        name = s["name"]
-        code = s["code"]
-        sector = s["sector"]
-        conf = s["confidence"]
+        perf = f"{s['change_pct']:+.2f}%" if s.get("change_pct") is not None else "—"
+        lines.append(
+            f"| {emoji} | **{s['name']}**({s['code']}) "
+            f"| {s['sector']} | {s['confidence']} | {perf} |"
+        )
 
-        if s.get("change_pct") is not None:
-            sign = "+" if s["change_pct"] >= 0 else ""
-            perf = f"{sign}{s['change_pct']:.2f}%"
-        else:
-            perf = "无数据"
-
-        lines.append(f"- {emoji} **{name}**（{code}）| {sector} | 信心{conf} → {perf}")
-
-    # 无数据时的提示
     if tracking["total_count"] == 0:
         lines.append("> ⚠️ 昨日推荐标的今日无行情数据（可能休市或数据延迟）")
 
@@ -273,7 +255,7 @@ def format_tracking_section(tracking: Optional[dict]) -> str:
 
 
 def format_tracking_plain(tracking: Optional[dict]) -> str:
-    """追踪数据的纯文本版本（CLI用）"""
+    """追踪数据的纯文本版本（CLI用，紧凑格式）"""
     if not tracking or not tracking.get("stocks"):
         return ""
 
@@ -285,9 +267,12 @@ def format_tracking_plain(tracking: Optional[dict]) -> str:
             f"均收益 {tracking['avg_return']:+.2f}% | "
             f"{tracking['hit_count']}涨/{tracking['miss_count']}跌"
         )
+    lines.append("")
     for s in tracking["stocks"]:
         emoji = "+" if s.get("hit") else ("-" if s.get("change_pct") is not None else "?")
-        perf = f"{s['change_pct']:+.2f}%" if s.get("change_pct") is not None else "无数据"
-        lines.append(f"   {emoji} {s['name']}({s['code']}) {s['sector']} → {perf}")
+        perf = f"{s['change_pct']:+.2f}%" if s.get("change_pct") is not None else "—"
+        lines.append(f"   {emoji} {s['name']:<6s} {s['code']}  {s['sector']:<12s} → {perf}")
+    if tracking["total_count"] == 0:
+        lines.append("   (今日暂无行情数据)")
     lines.append("")
     return "\n".join(lines)

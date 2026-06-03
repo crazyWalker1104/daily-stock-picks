@@ -696,7 +696,11 @@ class TechnicalFilterEngine:
     # ── 摘要生成 ───────────────────────────────────────────────
 
     def get_summary(self, filtered_recs: List[Recommendation]) -> str:
-        """生成技术面过滤摘要（Markdown）"""
+        """生成技术面过滤摘要（Markdown）
+
+        紧凑格式：每标的单行概要，只展示关键评分和状态。
+        详细信息由 formatter 层负责渲染。
+        """
         if not filtered_recs or not self._stats.get("total"):
             return ""
 
@@ -716,6 +720,7 @@ class TechnicalFilterEngine:
                     q = r.get("quote", {})
                     name = r["name"]
                     code = r["code"]
+                    score = r["technical_score"]
 
                     # 状态图标
                     if r["excluded"]:
@@ -725,38 +730,52 @@ class TechnicalFilterEngine:
                     else:
                         icon = "✅"
 
-                    # 基本信息
-                    parts = [f"{icon} **{name}**（{code}）"]
-                    if q.get("change_pct") is not None:
-                        parts.append(f"{q['change_pct']:+.2f}%")
-                    if q.get("turnover_rate"):
-                        parts.append(f"换手{q['turnover_rate']:.2f}%")
-                    if q.get("circulating_cap_yi"):
-                        parts.append(f"流通{q['circulating_cap_yi']:.1f}亿")
-
-                    lines.append("- " + " | ".join(parts))
-
-                    # 信号详情
+                    # 均线状态
+                    ma_status = ""
+                    ma_detail = ""
                     for sig in r["signals"]:
-                        sev = {"danger": "🔴", "warning": "🟡", "info": "ℹ️"}.get(
-                            sig["severity"], ""
-                        )
-                        lines.append(f"  {sev} {sig['message']}")
+                        if sig.get("type") == "ma_position" and "detail" in sig:
+                            d = sig["detail"]
+                            ma_status = {
+                                "bullish_aligned": "多头排列",
+                                "above_ma20": "MA20之上",
+                                "below_ma20": "MA20之下",
+                            }.get(d.get("status", ""), "")
+                            ma_detail = (
+                                f"MA5:{d.get('ma5','?')} "
+                                f"MA10:{d.get('ma10','?')} "
+                                f"MA20:{d.get('ma20','?')}"
+                            )
+                            break
 
-                    # 评分
-                    lines.append(f"  > 技术评分: {r['technical_score']}/100")
+                    # 单行概要
+                    meta_parts = [f"**{score}**分"]
+                    if ma_status:
+                        meta_parts.append(ma_status)
+                    chg = q.get("change_pct")
+                    if chg is not None:
+                        meta_parts.append(f"{chg:+.2f}%")
+                    cap = q.get("circulating_cap_yi")
+                    if cap:
+                        meta_parts.append(f"流通{cap:.0f}亿")
+                    tr_rate = q.get("turnover_rate")
+                    if tr_rate:
+                        meta_parts.append(f"换手{tr_rate:.1f}%")
 
-                    if r.get("kline_available"):
-                        # 查找MA信号
-                        for sig in r["signals"]:
-                            if sig.get("type") == "ma_position" and "detail" in sig:
-                                d = sig["detail"]
-                                lines.append(
-                                    f"  > MA5:{d.get('ma5','?')} "
-                                    f"MA10:{d.get('ma10','?')} "
-                                    f"MA20:{d.get('ma20','?')}"
-                                )
-                                break
+                    lines.append(f"- {icon} **{name}**（{code}）| {' · '.join(meta_parts)}")
+
+                    # 只在有警告/危险信号时展开详情
+                    warn_sigs = [
+                        s for s in r["signals"]
+                        if s["severity"] in ("warning", "danger")
+                    ]
+                    for sig in warn_sigs:
+                        sev_icon = "🟡" if sig["severity"] == "warning" else "🔴"
+                        lines.append(f"  {sev_icon} {sig['message']}")
+
+                    # MA 数值
+                    if ma_detail:
+                        lines.append(f"  > {ma_detail}")
 
         lines.append("")
         return "\n".join(lines)

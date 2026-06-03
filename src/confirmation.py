@@ -365,34 +365,64 @@ class DualConfirmationEngine:
         return confirmed
 
     def get_summary(self, confirmed_recs: List[Recommendation]) -> str:
-        """生成确认摘要（用于追加到AI Prompt的输出中）"""
+        """生成确认摘要（紧凑格式）
+
+        精简原则：资金信号一行、板块情绪一行、逐板块一行对齐结果。
+        """
         if not confirmed_recs:
             return ""
 
-        lines = ["## 🔍 双重确认引擎验证结果", ""]
+        lines = ["## 🔍 双重确认", ""]
 
         fund = self.get_fund_signal()
         lines.append(f"**资金面信号**：{fund['detail']}")
+
+        # 统计情绪分布
+        sentiment_stats = {"positive": 0, "negative": 0, "neutral": 0}
+        for rec in confirmed_recs:
+            if hasattr(rec, "confirmation") and rec.confirmation:
+                ns = rec.confirmation.get("news_sentiment", {})
+                sentiment_stats[ns.get("net_sentiment", "neutral")] += 1
+        if sentiment_stats["positive"]:
+            lines.append(f"**板块情绪**：{sentiment_stats['positive']}个板块偏多"
+                         + (f"，{sentiment_stats['negative']}个偏空" if sentiment_stats["negative"] else "")
+                         + (f"，{sentiment_stats['neutral']}个中性" if sentiment_stats["neutral"] else ""))
         lines.append("")
 
+        # 逐板块对齐（精简：同 alignment 的合并显示）
+        by_align = {}
         for rec in confirmed_recs:
             if hasattr(rec, "confirmation") and rec.confirmation:
                 conf = rec.confirmation
-                align = conf.get("alignment", "?")
-                icon = {
-                    "confirmed_bullish": "🟢",
-                    "confirmed_bearish": "🔴",
-                    "divergent": "⚠️",
-                    "uncertain": "❓",
-                }.get(align, "—")
+                align = conf.get("alignment", "uncertain")
+                if align not in by_align:
+                    by_align[align] = []
+                by_align[align].append((rec.sector, conf.get("adjustment", "")))
 
-                lines.append(
-                    f"{icon} **{rec.sector}**：{conf.get('explanation', '')}"
-                )
-                if conf.get("adjustment", "").startswith("↑") or conf.get(
-                    "adjustment", ""
-                ).startswith("↓"):
-                    lines.append(f"   → {conf['adjustment']}")
+        align_order = ["confirmed_bullish", "confirmed_bearish", "divergent", "uncertain"]
+        for align in align_order:
+            if align not in by_align:
+                continue
+            icon = {
+                "confirmed_bullish": "🟢",
+                "confirmed_bearish": "🔴",
+                "divergent": "⚠️",
+                "uncertain": "❓",
+            }.get(align, "—")
+            label = {
+                "confirmed_bullish": "双确认看多",
+                "confirmed_bearish": "双确认看空",
+                "divergent": "背离",
+                "uncertain": "待确认",
+            }.get(align, align)
+
+            sectors = [s for s, _ in by_align[align]]
+            lines.append(f"{icon} **{label}**：{'、'.join(sectors)}")
+
+            # 信心度变更
+            for sector, adj in by_align[align]:
+                if adj.startswith("↑") or adj.startswith("↓"):
+                    lines.append(f"   → {sector}：{adj}")
 
         lines.append("")
         return "\n".join(lines)

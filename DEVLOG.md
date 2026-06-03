@@ -194,11 +194,24 @@
 - 财联社爬虫持续返回0条
 - Git push 因网络问题仍无法推送到 origin（本地 commits 积压 2个）
 
+- 🎨 **UI 全面重构**（v2.0）：[src/formatter.py](src/formatter.py) 四种输出格式重新设计
+  - CLI 输出：框线头部 + 分隔线层次 + 可视化评分条（█▓▒░）+ 每标的单行技术摘要
+  - Markdown：推荐卡片三列表格（逻辑/催化/风险）+ 技术评分行内显示
+  - HTML 邮件：现代财经简报风格 — 暗色渐变头部、评分进度条、三列Grid、信心度色标
+  - GitHub Pages：全新 CSS 设计（Grid布局 + 卡片阴影 + 响应式 + 移动端适配）
+  - 确认摘要精简：同 alignment 板块合并一行，资金信号/板块情绪各一行
+  - 技术摘要精简：每标的单行概要（分数 · 均线 · 涨跌 · 市值），警告/危险标记展开
+  - 追踪格式：表格式明细（标的/板块/信心/今日表现）
+- 🔧 [src/confirmation.py](src/confirmation.py) `get_summary()` 合并同 alignment 板块，新增板块情绪统计
+- 🔧 [src/technical_filter.py](src/technical_filter.py) `get_summary()` 紧凑单行格式，信息密度翻倍
+- 🔧 [src/tracker.py](src/tracker.py) 追踪 Markdown 改为表格式、纯文本紧凑对齐
+
 **待办事项：**
 - [ ] 网络恢复后 push 本地 commits
 - [ ] GitHub Secrets 添加 QQ邮箱 + 微信配置，验证 CI 自动推送
 - [ ] Phase 2.3: 聚合器重构 — 多因子打分替换纯关键词匹配
 - [ ] 财联社爬虫修复
+- [x] UI 重构（CLI/Markdown/Email/Web 四种格式）
 
 **完成事项：**
 - 
