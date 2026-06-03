@@ -37,6 +37,7 @@ pip install -r requirements.txt
 | **聚合器** | [src/aggregator.py](src/aggregator.py) | 去重→关键词打分→排序截断→格式化 | 调整打分逻辑时 |
 | **追踪器** | [src/tracker.py](src/tracker.py) | 昨日推荐vs今日行情对比，胜率/均收益统计 | 新增追踪维度时 |
 | **确认引擎** | [src/confirmation.py](src/confirmation.py) | 资金流向×新闻情绪双重确认，信心度调整（Phase 2.1） | 调整确认逻辑时 |
+| **技术面过滤** | [src/technical_filter.py](src/technical_filter.py) | 实时行情+K线技术指标过滤，评分×信心度（Phase 2.2） | 调整过滤逻辑时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
 | **格式化** | [src/formatter.py](src/formatter.py) | Markdown/纯文本/HTML邮件/HTML网页 四种输出 | 改模板样式时 |
 | **推送模块** | [src/pusher.py](src/pusher.py) | BasePusher + 4通道 + 注册表 + Pusher管理器 | 新增推送通道时 |
@@ -163,6 +164,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-03 | v1.7 | Phase 2.2: 技术面过滤引擎（均线/量能/超买检测+综合评分+信心度调整） |
 | 2026-06-02 | v1.6 | Phase 2.1: 双重确认引擎（资金流向×新闻情绪交叉验证+信心度调整） |
 | 2026-06-02 | v1.5.1 | BugFix: GitHub Actions 交易日检查双重Bug + market_data push2→Sina API |
 | 2026-06-01 | v1.5 | Phase 1.3: akshare增强行情（北向资金+主力趋势+板块排名分层架构） |
@@ -179,6 +181,8 @@ Daily Stock Picks/
 | 市场数据(实时) | ✅ 就绪 | 东方财富 push2 API：指数+板块资金流+成交额 |
 | 市场数据(增强) | ✅ 新增 | akshare：北向资金+主力趋势+板块排名 |
 | 次日追踪 | ✅ 就绪 | 昨日推荐vs今日行情对比，胜率统计 |
+| 双重确认引擎 | ✅ 就绪 | 资金流向×新闻情绪交叉验证（Phase 2.1） |
+| 技术面过滤 | ✅ 新增 | K线均线+量能+超买检测+综合评分（Phase 2.2） |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
 | QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
 | 163邮箱推送 | ✅ 就绪 | SMTP 465/SSL，授权码登录 |
@@ -194,7 +198,7 @@ Daily Stock Picks/
 | Phase | 周期 | 目标 | 入口 |
 |:---|:---|:---|:---|
 | Phase 1 | 2026-05-31 ~ 06-07 | 基础夯实：市场数据注入 + 次日追踪 + akshare | [DEVLOG.md](DEVLOG.md) |
-| Phase 2 | 2026-06-08 ~ 06-14 | 量化因子：资金×情绪确认 + 技术面过滤 + 多因子打分 | [DEVLOG.md](DEVLOG.md) |
+| Phase 2 | 2026-06-03 ~ 06-14 | 量化因子：资金×情绪确认 ✅ + 技术面过滤 ✅ + 多因子打分 | [DEVLOG.md](DEVLOG.md) |
 | Phase 3 | 2026-06-15 ~ 06-21 | 数据沉淀：SQLite推荐库 + 因子有效性检验 + 策略分层 | [DEVLOG.md](DEVLOG.md) |
 | Phase 4 | 2026-06-22+ | 策略进化：新数据源 + 行业热力图 + 报告升级 | [DEVLOG.md](DEVLOG.md) |
 

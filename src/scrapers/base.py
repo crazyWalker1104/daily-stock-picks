@@ -34,6 +34,7 @@ class BaseScraper(ABC):
         self.timeout = self.config.get("scraper", {}).get("timeout", 15)
         self.max_retries = self.config.get("scraper", {}).get("max_retries", 3)
         self.session = requests.Session()
+        self.session.trust_env = False  # 禁用系统代理（国内金融站点直连更快）
 
     def _get_headers(self) -> dict:
         """随机UA + 基础请求头"""

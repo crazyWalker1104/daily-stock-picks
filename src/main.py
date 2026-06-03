@@ -99,6 +99,17 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
         engine = get_engine()
         report.confirmation_summary = engine.get_summary(confirmed_recs)  # type: ignore
 
+    # Phase 2.2: 技术面过滤 — 实时行情+技术指标验证标的
+    if report.recommendations:
+        logger.info("Phase 2.2: 技术面过滤...")
+        tf_config = config.get("technical_filter", {})
+        if tf_config.get("enabled", True):
+            from src.technical_filter import apply_technical_filter, get_engine as get_tf_engine
+            filtered_recs = apply_technical_filter(report.recommendations, tf_config)
+            report.recommendations = filtered_recs
+            tf_engine = get_tf_engine()
+            report.technical_summary = tf_engine.get_summary(filtered_recs)  # type: ignore
+
     # Phase 2.5: 昨日推荐追踪
     tracking = track_yesterday(date)
     if tracking:

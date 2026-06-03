@@ -44,6 +44,7 @@ class DailyReport:
     sources_used: list     # 本次使用的信息源
     tracking: dict = field(default_factory=dict)  # 昨日推荐追踪结果（tracker模块填充）
     confirmation_summary: str = ""  # 双重确认引擎验证摘要（Phase 2.1）
+    technical_summary: str = ""     # 技术面过滤摘要（Phase 2.2）
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
@@ -54,5 +55,6 @@ class DailyReport:
             "sources_used": self.sources_used,
             "tracking": self.tracking,
             "confirmation_summary": self.confirmation_summary,
+            "technical_summary": self.technical_summary,
             "generated_at": self.generated_at
         }

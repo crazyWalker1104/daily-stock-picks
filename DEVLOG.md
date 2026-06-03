@@ -167,7 +167,38 @@
 
 ---
 
-### 模板：YYYY-MM-DD (周X) — vX.X
+### 2026-06-03 (周三) — v1.7
+
+**完成事项：**
+- 🚀 **Phase 2.2 完成**：新增 [src/technical_filter.py](src/technical_filter.py) 技术面过滤引擎
+  - `TechnicalFilterEngine` 类：实时行情+K线数据交叉验证AI推荐标的
+  - 基础过滤（无需K线）：ST检查、涨停接近度、换手率、流通市值、日内振幅
+  - 增强过滤（需K线）：MA5/MA10/MA20均线位置、量能异常（放量/缩量）、连续上涨天数（超买检测）
+  - 综合评分系统（0-100）：换手率+市值+涨跌幅+振幅+均线+量能多维度加权
+  - 信心度自动调整：标的被排除→降级，所有标的评分>75→升级
+  - K线 fallback 机制：push2实时API失败时，用 akshare K线末条收盘价/量替代
+  - Markdown/HTML/纯文本三种格式均追加技术面过滤摘要
+- 🐛 **修复代理阻塞**：[src/scrapers/base.py](src/scrapers/base.py) `requests.Session()` 新增 `trust_env = False`，绕开系统代理直接访问国内金融站点
+- 🔧 [src/models.py](src/models.py) `DailyReport` 新增 `technical_summary` 字段
+- 🔧 [src/main.py](src/main.py) 管道新增 Phase 2.2 步骤（Phase 2.1 确认引擎之后）
+- 🔧 [config/config.example.yaml](config/config.example.yaml) 新增 `technical_filter` 配置节
+
+**验证结果：**
+- 6/2→6/3 追踪：5涨/1跌，胜率83%，均收益 **+5.97%** 🎉
+- 技术面过滤今日通过 8/8 只标的，均线多头排列 4只(88分)、MA20之上 3只(78分)、MA20之下 1只(63分)
+- QQ邮箱 + 微信 + CLI + Web 四通道推送全部成功
+
+**遇到的问题：**
+- `push2.eastmoney.com` 实时行情API不稳定（RemoteDisconnected），但 K线 fallback 机制已完善解决
+- 代理 `127.0.0.1:7897` 未启动导致所有爬虫阻塞 → `trust_env = False` 修复
+- 财联社爬虫持续返回0条
+- Git push 因网络问题仍无法推送到 origin（本地 commits 积压 2个）
+
+**待办事项：**
+- [ ] 网络恢复后 push 本地 commits
+- [ ] GitHub Secrets 添加 QQ邮箱 + 微信配置，验证 CI 自动推送
+- [ ] Phase 2.3: 聚合器重构 — 多因子打分替换纯关键词匹配
+- [ ] 财联社爬虫修复
 
 **完成事项：**
 - 

@@ -52,6 +52,11 @@ def format_markdown(report: DailyReport) -> str:
         lines.append(report.confirmation_summary)
         lines.append("")
 
+    # 技术面过滤摘要（Phase 2.2）
+    if hasattr(report, "technical_summary") and report.technical_summary:
+        lines.append(report.technical_summary)
+        lines.append("")
+
     # 昨日推荐回顾
     tracking_text = format_tracking_section(report.tracking)
     if tracking_text:
@@ -172,6 +177,39 @@ def format_email_html(report: DailyReport) -> str:
             </tr>
         </table>"""
 
+    # 技术面过滤摘要（Phase 2.2）
+    technical_html = ""
+    if hasattr(report, "technical_summary") and report.technical_summary:
+        tech_lines = report.technical_summary.strip().split("\n")
+        tech_body = ""
+        for line in tech_lines:
+            if line.startswith("## "):
+                tech_body += f'<div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:12px;">{line[3:]}</div>'
+            elif line.startswith("**"):
+                tech_body += f'<p style="font-size:14px;color:#333;margin:8px 0;">{line}</p>'
+            elif line.startswith("### "):
+                tech_body += f'<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;">{line[4:]}</div>'
+            elif line.strip().startswith(("- ✅", "- ⚠️", "- 🚫")):
+                tech_body += f'<p style="font-size:13px;color:#555;margin:2px 0 2px 12px;">{line.strip()}</p>'
+            elif line.strip().startswith(("  🔴", "  🟡", "  ℹ️")):
+                tech_body += f'<p style="font-size:12px;color:#888;margin:1px 0 1px 24px;">{line.strip()}</p>'
+            elif line.strip().startswith("  >"):
+                tech_body += f'<p style="font-size:12px;color:#999;margin:1px 0 1px 24px;font-style:italic;">{line.strip()}</p>'
+            elif line.strip():
+                tech_body += f'<p style="font-size:14px;color:#666;margin:4px 0;">{line.strip()}</p>'
+
+        technical_html = f"""
+        <!-- 技术面过滤结果 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="background:#f0f5ff;border-radius:8px;margin-top:16px;margin-bottom:16px;
+            border:1px solid #adc6ff;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+            <tr>
+                <td style="padding:20px 24px;">
+                    {tech_body}
+                </td>
+            </tr>
+        </table>"""
+
     # 昨日推荐回顾区块（HTML）
     tracking_html = ""
     if report.tracking and report.tracking.get("stocks"):
@@ -274,6 +312,7 @@ def format_email_html(report: DailyReport) -> str:
                         <td style="background:#fff;padding:24px 20px;">
                             {cards_html}
                             {confirmation_html}
+                            {technical_html}
                             {tracking_html}
                         </td>
                     </tr>
@@ -343,6 +382,11 @@ def format_plain(report: DailyReport) -> str:
     # 双重确认引擎验证摘要（Phase 2.1）
     if hasattr(report, "confirmation_summary") and report.confirmation_summary:
         lines.append(report.confirmation_summary)
+        lines.append("")
+
+    # 技术面过滤摘要（Phase 2.2）
+    if hasattr(report, "technical_summary") and report.technical_summary:
+        lines.append(report.technical_summary)
         lines.append("")
 
     # 昨日推荐回顾

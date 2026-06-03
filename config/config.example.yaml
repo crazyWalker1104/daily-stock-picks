@@ -37,3 +37,17 @@ scraper:
 output:
   max_recommendations: 5
   save_raw_data: true  # 是否保存原始采集数据
+
+# 技术面过滤配置 (Phase 2.2)
+technical_filter:
+  enabled: true
+  min_turnover_rate: 0.5         # 最低换手率%(低于标记低流动性)
+  small_cap_threshold_yi: 20     # 小盘股阈值(亿)
+  micro_cap_threshold_yi: 5      # 微盘股阈值(亿)
+  limit_up_threshold: 9.5        # 接近涨停线%(主板)
+  limit_up_threshold_gem: 19.5   # 接近涨停线%(创业板/科创板)
+  consecutive_rise_warning: 3    # 连涨N天 → 警告
+  consecutive_rise_exclude: 5    # 连涨N天 → 排除
+  volume_surge_ratio: 2.0        # 放量倍数(相对5日均量)
+  volume_shrink_ratio: 0.3       # 缩量比例(相对5日均量)
+  use_akshare_enhancement: true  # 是否使用akshare K线增强
