@@ -2,9 +2,12 @@ name: 每日A股推荐推送
 
 on:
   schedule:
-    # 每个交易日 8:30 CST (0:30 UTC)
-    # 注意：GitHub Actions cron 使用 UTC时间
+    # 每个交易日 8:30 CST (0:30 UTC) — 盘前预跑
+    # 注意：GitHub Actions cron 使用 UTC时间 (CST = UTC+8)
     - cron: '30 0 * * 1-5'
+    # 每个交易日 9:35 CST (1:35 UTC) — 开盘后补充运行
+    # push2.eastmoney.com 开盘前大面积断连，9:30 后数据就绪
+    - cron: '35 1 * * 1-5'
   workflow_dispatch:
     inputs:
       date:
