@@ -51,3 +51,9 @@ technical_filter:
   volume_surge_ratio: 2.0        # 放量倍数(相对5日均量)
   volume_shrink_ratio: 0.3       # 缩量比例(相对5日均量)
   use_akshare_enhancement: true  # 是否使用akshare K线增强
+
+# SQLite 推荐数据库 (Phase 3.1)
+database:
+  enabled: true               # 是否启用数据库存储（关闭后管道跳过所有DB操作）
+  path: data/recommendations.db  # 相对项目根目录的数据库文件路径
+  migrate_on_start: true      # 首次运行时自动导入已有的JSON报告

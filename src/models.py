@@ -58,3 +58,28 @@ class DailyReport:
             "technical_summary": self.technical_summary,
             "generated_at": self.generated_at
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DailyReport":
+        """从字典重建 DailyReport 实例（用于数据库迁移和恢复）"""
+        recs = []
+        for r in data.get("recommendations", []):
+            recs.append(Recommendation(
+                sector=r.get("sector", ""),
+                confidence=r.get("confidence", ""),
+                logic=r.get("logic", ""),
+                stocks=r.get("stocks", []),
+                catalyst=r.get("catalyst", ""),
+                risk=r.get("risk", ""),
+                source=r.get("source", []),
+            ))
+        return cls(
+            date=data.get("date", ""),
+            recommendations=recs,
+            raw_news_count=data.get("raw_news_count", 0),
+            sources_used=data.get("sources_used", []),
+            tracking=data.get("tracking", {}),
+            confirmation_summary=data.get("confirmation_summary", ""),
+            technical_summary=data.get("technical_summary", ""),
+            generated_at=data.get("generated_at", ""),
+        )

@@ -80,11 +80,10 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
     # Phase 2: 聚合 + 市场数据 + AI分析
     logger.info("Phase 2: 采集市场数据...")
     market_data = collect_market_data()
-    from src.market_data import format_market_overview
     market_context = format_market_overview(market_data)
 
-    logger.info("Phase 2: AI分析...")
-    news_text = aggregate(all_news, max_for_ai=40)
+    logger.info("Phase 2: AI分析（多因子聚合）...")
+    news_text = aggregate(all_news, max_for_ai=40, market_data=market_data)
     analyzer = AIAnalyzer(config)
     report = analyzer.analyze(news_text, date, market_context=market_context)
 
@@ -120,6 +119,12 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(report.to_dict(), f, ensure_ascii=False, indent=2)
+
+    # Phase 3.1: SQLite 数据库存储
+    from src.database import save_report, update_tracking
+    if tracking:
+        update_tracking(date, tracking, config)
+    save_report(report, config)
 
     # Phase 3: 推送
     if dry_run:
