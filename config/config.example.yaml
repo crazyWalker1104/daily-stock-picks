@@ -52,6 +52,13 @@ technical_filter:
   volume_shrink_ratio: 0.3       # 缩量比例(相对5日均量)
   use_akshare_enhancement: true  # 是否使用akshare K线增强
 
+# 因子有效性分析 (Phase 3.2)
+factor_analysis:
+  enabled: true                  # 是否启用因子分析模块
+  min_samples_for_stats: 10      # 最小样本数要求（低于此值标注⚠️）
+  quantile_bins: 4               # 分位数分析的分组数
+  inject_into_report: false      # 是否在每日报告中追加因子分析摘要（Phase 3.3启用）
+
 # SQLite 推荐数据库 (Phase 3.1)
 database:
   enabled: true               # 是否启用数据库存储（关闭后管道跳过所有DB操作）

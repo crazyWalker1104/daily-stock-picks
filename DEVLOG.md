@@ -1,6 +1,6 @@
 # 开发日志 · Daily Stock Picks
 
-> 最后更新：2026-06-04 | 当前阶段：Phase 3 — 数据沉淀（3.1 ✅，3.2 待启动）
+> 最后更新：2026-06-05 | 当前阶段：Phase 3 — 数据沉淀（3.1 ✅，3.2 ✅，3.3 待启动）
 
 ---
 
@@ -50,7 +50,7 @@
 | # | 任务 | 状态 | 优先级 | 依赖 |
 |:---|:---|:---|:---|:---|
 | 3.1 | SQLite 推荐数据库 + 历史查询 | ✅ | P0 | Phase 2 |
-| 3.2 | 因子有效性检验 — 哪个指标真正预测了涨跌？ | ⏳ | P1 | 3.1 |
+| 3.2 | 因子有效性检验 — 哪个指标真正预测了涨跌？ | ✅ | P1 | 3.1 |
 | 3.3 | 策略分层：追强/抄底/事件驱动三条线 | ⏳ | P2 | 3.1 |
 
 ### Phase 4：策略进化 `计划 2026-06-22+`
@@ -247,7 +247,44 @@
 - CLI 查询：`--stats` / `--history` / `--date` / `--recent` 四个命令全部可用
 
 **待办事项：**
-- [ ] Phase 3.2: 因子有效性检验 — 指标 vs 实际涨跌的相关性
+- [x] Phase 3.2: 因子有效性检验 — 指标 vs 实际涨跌的相关性
+- [ ] 财联社爬虫修复
+- [ ] 雪球爬虫启用（配置 cookie）
+
+---
+
+### 2026-06-05 (周五) — v2.3
+
+**完成事项：**
+- 🚀 **Phase 3.2 完成**：新增 [src/factor_analyzer.py](src/factor_analyzer.py) 因子有效性检验模块
+  - `FactorAnalyzerEngine` 类：Engine + Singleton + Convenience 三件套模式（复用 `DatabaseEngine` 单例）
+  - 5 维分析：连续因子相关性(Pearson r + Spearman rho) + 分类因子分组对比 + Rank IC + 分位数 + 因子综合排名
+  - 零外部依赖：仅 stdlib（sqlite3 + math + statistics），自己实现 `_pearson_r`、`_spearman_rho`、`_rankdata`、`_t_pvalue`、`_mean_ci`
+  - 小样本诚实：N<30 处处标注 ⚠️；N<3 跳过统计；零方差因子→返回 None + 说明
+  - 3 种 CLI 输出格式：`--format table`（默认框线表格）/ `markdown`（可注入报告）/ `json`（程序消费）
+  - 独立 CLI 工具，不嵌入每日管道（分析是"回头看"）
+- 🔧 `config/config.yaml` + `config.example.yaml` 新增 `factor_analysis:` 配置节
+- 📝 更新 CLAUDE.md: 命令 + 文件索引 + 状态表 + P0优先级 + 版本记录
+- 📝 更新 DEVLOG.md: 路线图 + 日记录
+
+**分析结果（初步）：**
+- 8/41 只有追踪的标的，仅来自 06-04→06-05 一个交易日
+- `technical_score` 全部为 63 分（零方差），无法计算任何相关性 ← 需要更多交易日累积差异化评分
+- `change_pct_at_rec`/`turnover_rate`/`circulating_cap_yi` 全为 NULL（盘前运行获取不到实时数据）
+- `alignment` 全部为 "uncertain"（单分组）
+- **唯一有信号的因子：confidence** — 中信心(5只)胜率60%/均收益+1.05% vs 高信心(3只)胜率67%/均收益-0.85%
+  - 反直觉：高信心标的均收益为负！但 CI 宽度很大([-5.26%, +3.56%])，样本太少
+  - 组间收益差 1.90%，效应量中等区分力
+
+**关键发现：**
+- 盘前运行导致 change_pct/turnover/cap 全为 NULL → **需要用 9:35 开盘后补充运行来填充这些因子**
+- 9:35 CI cron 触发后，`save_report()` 会用新的实时数据覆盖早上的行（INSERT OR REPLACE），从而填充因子列
+- 当前数据基础设施已就绪，但需要约 10+ 个交易日（40-50+ 追踪样本）才能开始产出有意义的因子分析结论
+- 因子分析模块本身设计正确：当样本充足时自动增加统计效力，样本不足时诚实标注 ⚠️
+
+**待办事项：**
+- [ ] Phase 3.3: 策略分层 — 追强/抄底/事件驱动三条线
+- [ ] 9:35 CI cron 触发验证 — 确认开盘后运行能填充 change_pct/turnover/cap
 - [ ] 财联社爬虫修复
 - [ ] 雪球爬虫启用（配置 cookie）
 
