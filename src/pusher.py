@@ -14,6 +14,10 @@ import requests
 from src.models import DailyReport
 from src.formatter import format_markdown, format_plain, format_html_page, format_email_html
 
+# 共享 Session：禁用系统代理（国内推送服务直连更快）
+_push_session = requests.Session()
+_push_session.trust_env = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,7 +132,7 @@ class WeChatPusher(BasePusher):
         body = format_markdown(report)
 
         try:
-            resp = requests.post(
+            resp = _push_session.post(
                 f"{self.api_url}/{self.sendkey}.send",
                 data={"title": title, "desp": body},
                 timeout=15,
