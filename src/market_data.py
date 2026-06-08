@@ -18,6 +18,11 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# 共享 Session：禁用系统代理（国内金融 API 直连更快）
+# 修复：与 scrapers/base.py 保持一致，避免代理导致的 SSLEOFError
+_session = requests.Session()
+_session.trust_env = False
+
 # ── akshare 懒加载 ─────────────────────────────────────────────────
 _ak = None
 
@@ -73,12 +78,7 @@ def fetch_index_data() -> List[dict]:
     if result:
         return result
 
-    # 兜底1：push2 API
-    result = _fetch_index_from_push()
-    if result:
-        return result
-
-    # 兜底2：akshare（使用非 push2 API）
+    # 兜底：akshare
     return _fetch_index_from_akshare()
 
 
@@ -93,7 +93,7 @@ def _fetch_index_from_sina() -> List[dict]:
         url = "https://hq.sinajs.cn/list=" + ",".join(sina_codes.keys())
         headers = {"Referer": "https://finance.sina.com.cn",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = _session.get(url, headers=headers, timeout=10)
         resp.encoding = "gbk"
         text = resp.text
 
@@ -169,7 +169,7 @@ def fetch_sector_flow(top_n: int = 5) -> dict:
         "fields": "f12,f14,f2,f3,f62,f184,f66",
     }
     try:
-        resp = requests.get(SECTOR_FLOW_API, params=params, headers=_get_headers(), timeout=10)
+        resp = _session.get(SECTOR_FLOW_API, params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         data = resp.json()
         # 兼容 data 为 null 的场景（非交易日/休市）
@@ -215,7 +215,7 @@ def fetch_market_stat() -> dict:
         "invt": "2",
     }
     try:
-        resp = requests.get(MARKET_STAT_API, params=params, headers=_get_headers(), timeout=10)
+        resp = _session.get(MARKET_STAT_API, params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         data = resp.json()
         inner = data.get("data")
@@ -288,7 +288,7 @@ def fetch_north_bound_flow() -> dict:
             "lmt": "0", "klt": "1", "fields1": "f1,f3",
             "fields2": "f51,f52", "ut": "b2884a393a59ad64002292a3e90d46a5",
         }
-        resp = requests.get(NORTH_BOUND_API,
+        resp = _session.get(NORTH_BOUND_API,
                            params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         data = resp.json()

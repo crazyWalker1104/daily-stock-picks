@@ -2,10 +2,12 @@
 
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import List
 
+import httpx
 from openai import OpenAI
 
 from src.models import Recommendation, DailyReport
@@ -79,7 +81,13 @@ class AIAnalyzer:
             logger.warning("未设置API Key，AI分析将不可用")
             self.client = None
         else:
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            # 禁用系统代理（直连 DeepSeek API 更快，避免代理 SSLEOFError）
+            http_client = httpx.Client(trust_env=False)
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                http_client=http_client,
+            )
 
     def analyze(self, news_text: str, date: str = None,
                 market_context: str = "") -> DailyReport:

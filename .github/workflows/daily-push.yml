@@ -89,9 +89,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 拉取远程最新代码并 rebase 本地提交
+          # 拉取远程最新，用 reset 代替 rebase 避免双轮 cron 文件冲突
           git fetch origin main
-          git rebase origin/main || git rebase --abort
+          git checkout main
+          git reset --soft origin/main
 
           # 添加 docs 和 output 目录变更
           git add docs/ output/
@@ -104,8 +105,11 @@ jobs:
               exit 1
             }
             git push origin main || {
-              echo "推送失败，尝试重新拉取"
-              git pull --rebase origin main
+              echo "推送失败，尝试重新拉取并推送"
+              git fetch origin main
+              git reset --soft origin/main
+              git add docs/ output/
+              git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || true
               git push origin main
             }
           fi
