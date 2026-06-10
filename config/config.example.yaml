@@ -52,6 +52,21 @@ technical_filter:
   volume_shrink_ratio: 0.3       # 缩量比例(相对5日均量)
   use_akshare_enhancement: true  # 是否使用akshare K线增强
 
+# 策略分层 (Phase 3.3)
+strategy_classifier:
+  enabled: true                     # 是否启用策略分类
+  min_score_to_classify: 15         # 最低分才标记策略（否则归为"观望"）
+  min_margin: 5                     # top1 vs top2 最小分差（否则归为"观望"）
+  momentum:
+    tech_score_high: 80             # 追强技术分高阈值
+    tech_score_mid: 70              # 追强技术分中阈值
+  bottom_fish:
+    tech_score_max: 74              # 抄底技术分上限
+    tech_score_min: 60              # 抄底技术分下限
+  event:
+    tech_score_max: 79              # 事件驱动技术分上限
+    tech_score_min: 60              # 事件驱动技术分下限
+
 # 因子有效性分析 (Phase 3.2)
 factor_analysis:
   enabled: true                  # 是否启用因子分析模块

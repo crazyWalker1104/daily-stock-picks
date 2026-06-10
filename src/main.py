@@ -109,6 +109,17 @@ def run(date: str = None, dry_run: bool = False, selected_channels: list = None)
             tf_engine = get_tf_engine()
             report.technical_summary = tf_engine.get_summary(filtered_recs)  # type: ignore
 
+    # Phase 2.3: 策略分层 — 归类到追强/抄底/事件驱动
+    if report.recommendations:
+        logger.info("Phase 2.3: 策略分层...")
+        sc_config = config.get("strategy_classifier", {})
+        if sc_config.get("enabled", True):
+            from src.strategy_classifier import classify_recommendations, get_engine as get_sc_engine
+            classified = classify_recommendations(report.recommendations, sc_config)
+            report.recommendations = classified
+            sc_engine = get_sc_engine()
+            report.strategy_summary = sc_engine.get_summary(classified)  # type: ignore
+
     # Phase 2.5: 昨日推荐追踪
     tracking = track_yesterday(date)
     if tracking:

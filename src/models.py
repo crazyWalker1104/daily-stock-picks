@@ -45,6 +45,7 @@ class DailyReport:
     tracking: dict = field(default_factory=dict)  # 昨日推荐追踪结果（tracker模块填充）
     confirmation_summary: str = ""  # 双重确认引擎验证摘要（Phase 2.1）
     technical_summary: str = ""     # 技术面过滤摘要（Phase 2.2）
+    strategy_summary: str = ""      # 策略分类摘要（Phase 3.3）
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
@@ -56,6 +57,7 @@ class DailyReport:
             "tracking": self.tracking,
             "confirmation_summary": self.confirmation_summary,
             "technical_summary": self.technical_summary,
+            "strategy_summary": self.strategy_summary,
             "generated_at": self.generated_at
         }
 
@@ -81,5 +83,6 @@ class DailyReport:
             tracking=data.get("tracking", {}),
             confirmation_summary=data.get("confirmation_summary", ""),
             technical_summary=data.get("technical_summary", ""),
+            strategy_summary=data.get("strategy_summary", ""),
             generated_at=data.get("generated_at", ""),
         )

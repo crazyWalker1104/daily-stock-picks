@@ -18,6 +18,10 @@ CONFIDENCE_EMOJI = {"高": "🔥", "中": "📈", "低": "📌"}
 CONFIDENCE_COLOR = {"高": "#d4380d", "中": "#d48806", "低": "#8c8c8c"}
 CONFIDENCE_BG = {"高": "#fff2f0", "中": "#fffbe6", "低": "#fafafa"}
 
+STRATEGY_EMOJI = {"追强": "🚀", "抄底": "🎯", "事件驱动": "⚡", "观望": "👀"}
+STRATEGY_COLOR = {"追强": "#cf1322", "抄底": "#237804", "事件驱动": "#2f54eb", "观望": "#8c8c8c"}
+STRATEGY_BG = {"追强": "#fff2f0", "抄底": "#f6ffed", "事件驱动": "#f0f5ff", "观望": "#fafafa"}
+
 SCORE_COLORS = [
     (40, "#d4380d"),   # 0-40: 红色 — 弱
     (60, "#fa8c16"),   # 40-60: 橙色 — 一般
@@ -104,7 +108,11 @@ def format_plain(report: DailyReport) -> str:
     else:
         for i, rec in enumerate(report.recommendations, 1):
             emoji = CONFIDENCE_EMOJI.get(rec.confidence, "📌")
-            lines.append(f"  {emoji}  {rec.sector}                         [信心: {rec.confidence}]")
+            strategy_label = ""
+            if hasattr(rec, "strategy") and rec.strategy and rec.strategy != "观望":
+                se = STRATEGY_EMOJI.get(rec.strategy, "")
+                strategy_label = f"  [{se} {rec.strategy}]"
+            lines.append(f"  {emoji}  {rec.sector}{strategy_label}                         [信心: {rec.confidence}]")
             lines.append("  " + "─" * (W - 4))
 
             # 标的标签
@@ -150,6 +158,11 @@ def format_plain(report: DailyReport) -> str:
     # 技术面摘要（精简版）
     if hasattr(report, "technical_summary") and report.technical_summary:
         lines.append(_render_technical_plain(report.technical_summary))
+        lines.append("")
+
+    # 策略分层摘要
+    if hasattr(report, "strategy_summary") and report.strategy_summary:
+        lines.append(f"  📐 策略分布：{report.strategy_summary}")
         lines.append("")
 
     # 追踪
@@ -249,7 +262,11 @@ def format_markdown(report: DailyReport) -> str:
     else:
         for i, rec in enumerate(report.recommendations, 1):
             emoji = CONFIDENCE_EMOJI.get(rec.confidence, "📌")
-            lines.append(f"## {i}. {emoji} {rec.sector} — 信心度：{rec.confidence}")
+            strategy_label = ""
+            if hasattr(rec, "strategy") and rec.strategy and rec.strategy != "观望":
+                se = STRATEGY_EMOJI.get(rec.strategy, "")
+                strategy_label = f"  |  {se} {rec.strategy}"
+            lines.append(f"## {i}. {emoji} {rec.sector} — 信心度：{rec.confidence}{strategy_label}")
             lines.append("")
 
             if rec.stocks:
@@ -295,6 +312,12 @@ def format_markdown(report: DailyReport) -> str:
 
     if hasattr(report, "technical_summary") and report.technical_summary:
         lines.append(_compact_technical_md(report.technical_summary))
+        lines.append("")
+
+    if hasattr(report, "strategy_summary") and report.strategy_summary:
+        lines.append(f"## 📐 策略分布")
+        lines.append("")
+        lines.append(f"**{report.strategy_summary}**")
         lines.append("")
 
     tracking_text = format_tracking_section(report.tracking)
@@ -380,6 +403,19 @@ def format_email_html(report: DailyReport) -> str:
     # ── 技术面区块 ──
     tech_html = _render_technical_email(report)
 
+    # ── 策略分布区块 ──
+    strategy_html = ""
+    if hasattr(report, "strategy_summary") and report.strategy_summary:
+        strategy_html = f"""
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+        style="background:#fff7e6;border-radius:10px;margin-top:18px;margin-bottom:18px;
+        border:1px solid #ffd591;">
+        <tr><td style="padding:16px 22px;">
+            <div style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">📐 策略分布</div>
+            <p style="font-size:14px;color:#555;margin:0;">{report.strategy_summary}</p>
+        </td></tr>
+    </table>"""
+
     # ── 追踪区块 ──
     tracking_html = _render_tracking_email(report)
 
@@ -427,6 +463,7 @@ def format_email_html(report: DailyReport) -> str:
     {cards_html}
     {confirm_html}
     {tech_html}
+    {strategy_html}
     {tracking_html}
 </td>
 </tr>
@@ -466,6 +503,18 @@ def _render_recommendation_card(rec: Recommendation, index: int) -> str:
     color = CONFIDENCE_COLOR.get(rec.confidence, "#8c8c8c")
     bg = CONFIDENCE_BG.get(rec.confidence, "#fafafa")
     emoji = CONFIDENCE_EMOJI.get(rec.confidence, "📌")
+
+    # 策略标签
+    strategy_html = ""
+    if hasattr(rec, "strategy") and rec.strategy and rec.strategy != "观望":
+        sc = STRATEGY_COLOR.get(rec.strategy, "#8c8c8c")
+        sbg = STRATEGY_BG.get(rec.strategy, "#fafafa")
+        se = STRATEGY_EMOJI.get(rec.strategy, "")
+        strategy_html = (
+            f'<span style="display:inline-block;background:{sbg};color:{sc};'
+            f'padding:3px 10px;margin-left:8px;border-radius:12px;font-size:11px;font-weight:600;'
+            f'border:1px solid {sc}44;">{se} {rec.strategy}</span>'
+        )
 
     # 标的标签
     stock_tags = ""
@@ -522,7 +571,7 @@ def _render_recommendation_card(rec: Recommendation, index: int) -> str:
                 <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                         <td style="font-size:17px;font-weight:700;color:#1a1a1a;padding-bottom:4px;">
-                            {emoji} {rec.sector}
+                            {emoji} {rec.sector}{strategy_html}
                         </td>
                         <td align="right">
                             <span style="display:inline-block;background:{color};color:#fff;
@@ -712,6 +761,16 @@ def format_html_page(report: DailyReport, history_dates: List[str] = None) -> st
     if hasattr(report, "technical_summary") and report.technical_summary:
         tech_html = _render_page_technical(report.technical_summary)
 
+    # ── 策略分布区块 ──
+    strategy_html = ""
+    if hasattr(report, "strategy_summary") and report.strategy_summary:
+        strategy_html = (
+            f'<div class="section-box" style="background:#fff7e6;border-color:#ffd591;">'
+            f'<h3>📐 策略分布</h3>'
+            f'<p style="font-size:14px;color:#555;">{report.strategy_summary}</p>'
+            f'</div>'
+        )
+
     # ── 追踪区块 ──
     tracking_html = _render_page_tracking(report)
 
@@ -833,6 +892,7 @@ def format_html_page(report: DailyReport, history_dates: List[str] = None) -> st
         {cards_html}
         {confirm_html}
         {tech_html}
+        {strategy_html}
         {tracking_html}
     </div>
 
@@ -858,6 +918,18 @@ def _render_page_card(rec: Recommendation, index: int) -> str:
     color = CONFIDENCE_COLOR.get(rec.confidence, "#8c8c8c")
     bg = CONFIDENCE_BG.get(rec.confidence, "#fafafa")
     emoji = CONFIDENCE_EMOJI.get(rec.confidence, "📌")
+
+    # 策略标签
+    strategy_html = ""
+    if hasattr(rec, "strategy") and rec.strategy and rec.strategy != "观望":
+        sc = STRATEGY_COLOR.get(rec.strategy, "#8c8c8c")
+        sbg = STRATEGY_BG.get(rec.strategy, "#fafafa")
+        se = STRATEGY_EMOJI.get(rec.strategy, "")
+        strategy_html = (
+            f'<span style="display:inline-block;background:{sbg};color:{sc};'
+            f'padding:3px 10px;margin-left:8px;border-radius:12px;font-size:11px;font-weight:600;'
+            f'border:1px solid {sc}44;">{se} {rec.strategy}</span>'
+        )
 
     stock_tags = ""
     if rec.stocks:
@@ -898,7 +970,7 @@ def _render_page_card(rec: Recommendation, index: int) -> str:
     <div class="rec-card" style="border-left-color:{color};">
         <div class="card-body">
             <div class="card-header">
-                <span class="sector">{emoji} {rec.sector}</span>
+                <span class="sector">{emoji} {rec.sector}{strategy_html}</span>
                 <span class="confidence-badge" style="background:{color};">信心 {rec.confidence}</span>
             </div>
             <div class="stock-tags"><span style="color:#999;font-size:12px;">🏷️ 标的：</span>{stock_tags}</div>
