@@ -130,23 +130,40 @@ def format_plain(report: DailyReport) -> str:
             # 技术评分（若有）
             if hasattr(rec, "technical") and rec.technical:
                 tr = rec.technical
-                lines.append("")
-                lines.append(f"  📊 技术评分")
-                for r in tr.get("stock_results", []):
-                    if r.get("excluded"):
-                        continue
-                    bar = _score_bar(r["technical_score"], 14)
-                    score = r["technical_score"]
-                    # 找 MA 状态
-                    ma_status = ""
-                    for sig in r["signals"]:
-                        if sig.get("type") == "ma_position" and "detail" in sig:
-                            ma_status = _ma_status_short(sig["detail"].get("status", ""))
-                            break
-                    q = r.get("quote", {})
-                    cap_str = f"流通{q['circulating_cap_yi']:.0f}亿" if q.get("circulating_cap_yi") else ""
-                    chg_str = f"{q['change_pct']:+.1f}%" if q.get("change_pct") is not None else ""
-                    lines.append(f"  {r['name']:<6s}  {bar}  {score:<3d}  {ma_status:<6s}  {chg_str}  {cap_str}")
+                stock_results = tr.get("stock_results", [])
+                if stock_results:
+                    # 检查行情数据是否有效
+                    all_missing = all(r.get("quote_missing", False) for r in stock_results if not r.get("excluded"))
+                    lines.append("")
+                    if all_missing:
+                        lines.append(f"  📊 技术面（盘前·待盘中确认）")
+                        for r in stock_results:
+                            if r.get("excluded"):
+                                continue
+                            ma_status = ""
+                            for sig in r["signals"]:
+                                if sig.get("type") == "ma_position" and "detail" in sig:
+                                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                                    break
+                            kline_note = "K线可用" if r.get("kline_available") else "待确认"
+                            lines.append(f"  {r['name']:<6s}  {ma_status or '—'}")
+                    else:
+                        lines.append(f"  📊 技术评分")
+                        for r in stock_results:
+                            if r.get("excluded"):
+                                continue
+                            bar = _score_bar(r["technical_score"], 14)
+                            score = r["technical_score"]
+                            # 找 MA 状态
+                            ma_status = ""
+                            for sig in r["signals"]:
+                                if sig.get("type") == "ma_position" and "detail" in sig:
+                                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                                    break
+                            q = r.get("quote", {})
+                            cap_str = f"流通{q['circulating_cap_yi']:.0f}亿" if q.get("circulating_cap_yi") else ""
+                            chg_str = f"{q['change_pct']:+.1f}%" if q.get("change_pct") is not None and q.get("change_pct") != 0 else ""
+                            lines.append(f"  {r['name']:<6s}  {bar}  {score:<3d}  {ma_status:<6s}  {chg_str}  {cap_str}")
 
             lines.append("")
 
@@ -286,20 +303,35 @@ def format_markdown(report: DailyReport) -> str:
             # 技术评分行（若有）
             if hasattr(rec, "technical") and rec.technical:
                 tr = rec.technical
-                score_items = []
-                for r in tr.get("stock_results", []):
-                    if r.get("excluded"):
-                        continue
-                    score = r["technical_score"]
-                    icon = "🟢" if score >= 75 else ("🟡" if score >= 60 else "🔴")
-                    ma_status = ""
-                    for sig in r["signals"]:
-                        if sig.get("type") == "ma_position" and "detail" in sig:
-                            ma_status = _ma_status_short(sig["detail"].get("status", ""))
-                            break
-                    score_items.append(f"{icon} {r['name']} **{score}**分 {ma_status}")
-                if score_items:
-                    lines.append(f"📊 技术评分：{' · '.join(score_items)}")
+                stock_results = tr.get("stock_results", [])
+                if stock_results:
+                    active = [r for r in stock_results if not r.get("excluded")]
+                    all_missing = all(r.get("quote_missing", False) for r in active) if active else True
+                    if all_missing:
+                        # 盘前/数据缺失 → 只显示MA状态
+                        items = []
+                        for r in active:
+                            ma_status = ""
+                            for sig in r["signals"]:
+                                if sig.get("type") == "ma_position" and "detail" in sig:
+                                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                                    break
+                            kline_note = "K线✓" if r.get("kline_available") else ""
+                            items.append(f"⏳ {r['name']} {ma_status or '待确认'} {kline_note}")
+                        lines.append(f"📊 技术面（盘前）：{' · '.join(items)}")
+                    else:
+                        score_items = []
+                        for r in active:
+                            score = r["technical_score"]
+                            icon = "🟢" if score >= 75 else ("🟡" if score >= 60 else "🔴")
+                            ma_status = ""
+                            for sig in r["signals"]:
+                                if sig.get("type") == "ma_position" and "detail" in sig:
+                                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                                    break
+                            score_items.append(f"{icon} {r['name']} **{score}**分 {ma_status}")
+                        if score_items:
+                            lines.append(f"📊 技术评分：{' · '.join(score_items)}")
                     lines.append("")
 
             lines.append("---")
@@ -531,32 +563,54 @@ def _render_recommendation_card(rec: Recommendation, index: int) -> str:
     score_html = ""
     if hasattr(rec, "technical") and rec.technical:
         tr = rec.technical
-        score_parts = []
-        for r in tr.get("stock_results", []):
-            if r.get("excluded"):
-                continue
-            score = r["technical_score"]
-            sc = _score_color(score)
-            ma_status = ""
-            for sig in r["signals"]:
-                if sig.get("type") == "ma_position" and "detail" in sig:
-                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
-                    break
-            score_parts.append(f"""
-            <div style="display:flex;align-items:center;margin-bottom:4px;">
-                <span style="font-size:11px;font-weight:600;color:#555;width:52px;text-align:right;margin-right:8px;">{r['name']}</span>
-                <span style="flex:1;height:6px;background:#eee;border-radius:3px;overflow:hidden;display:inline-block;max-width:140px;">
-                    <span style="display:block;height:6px;width:{score}%;background:{sc};border-radius:3px;"></span>
-                </span>
-                <span style="font-size:12px;font-weight:700;color:{sc};margin-left:8px;min-width:24px;">{score}</span>
-                <span style="font-size:10px;color:#999;margin-left:4px;">{ma_status}</span>
-            </div>""")
-        if score_parts:
-            score_html = f"""
-            <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #eee;">
-                <div style="font-size:11px;color:#999;margin-bottom:6px;">📊 技术面评分</div>
-                {"".join(score_parts)}
-            </div>"""
+        stock_results = tr.get("stock_results", [])
+        active = [r for r in stock_results if not r.get("excluded")]
+        all_missing = all(r.get("quote_missing", False) for r in active) if active else True
+        if all_missing:
+            # 盘前/数据缺失 → 简洁MA状态
+            ma_items = []
+            for r in active:
+                ma_status = ""
+                for sig in r["signals"]:
+                    if sig.get("type") == "ma_position" and "detail" in sig:
+                        ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                        break
+                note = ma_status if ma_status else ("K线可用" if r.get("kline_available") else "待确认")
+                ma_items.append(f"""<div style="display:flex;align-items:center;margin-bottom:3px;">
+                    <span style="font-size:11px;font-weight:600;color:#555;width:52px;text-align:right;margin-right:8px;">{r['name']}</span>
+                    <span style="font-size:11px;color:#999;">⏳ {note}</span>
+                </div>""")
+            if ma_items:
+                score_html = f"""
+                <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #eee;">
+                    <div style="font-size:11px;color:#999;margin-bottom:6px;">📊 技术面（盘前·待确认）</div>
+                    {"".join(ma_items)}
+                </div>"""
+        else:
+            score_parts = []
+            for r in active:
+                score = r["technical_score"]
+                sc = _score_color(score)
+                ma_status = ""
+                for sig in r["signals"]:
+                    if sig.get("type") == "ma_position" and "detail" in sig:
+                        ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                        break
+                score_parts.append(f"""
+                <div style="display:flex;align-items:center;margin-bottom:4px;">
+                    <span style="font-size:11px;font-weight:600;color:#555;width:52px;text-align:right;margin-right:8px;">{r['name']}</span>
+                    <span style="flex:1;height:6px;background:#eee;border-radius:3px;overflow:hidden;display:inline-block;max-width:140px;">
+                        <span style="display:block;height:6px;width:{score}%;background:{sc};border-radius:3px;"></span>
+                    </span>
+                    <span style="font-size:12px;font-weight:700;color:{sc};margin-left:8px;min-width:24px;">{score}</span>
+                    <span style="font-size:10px;color:#999;margin-left:4px;">{ma_status}</span>
+                </div>""")
+            if score_parts:
+                score_html = f"""
+                <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #eee;">
+                    <div style="font-size:11px;color:#999;margin-bottom:6px;">📊 技术面评分</div>
+                    {"".join(score_parts)}
+                </div>"""
 
     card = f"""
     <!-- 推荐卡片 {index} -->
@@ -944,27 +998,47 @@ def _render_page_card(rec: Recommendation, index: int) -> str:
     score_html = ""
     if hasattr(rec, "technical") and rec.technical:
         tr = rec.technical
-        rows = []
-        for r in tr.get("stock_results", []):
-            if r.get("excluded"):
-                continue
-            score = r["technical_score"]
-            sc = _score_color(score)
-            ma_status = ""
-            for sig in r["signals"]:
-                if sig.get("type") == "ma_position" and "detail" in sig:
-                    ma_status = _ma_status_short(sig["detail"].get("status", ""))
-                    break
-            rows.append(
-                f'<div class="score-row">'
-                f'<span class="score-name">{r["name"]}</span>'
-                f'<span class="score-bar-wrap"><span class="score-bar" style="width:{score}%;background:{sc};"></span></span>'
-                f'<span class="score-val" style="color:{sc};">{score}</span>'
-                f'<span class="score-ma">{ma_status}</span>'
-                f'</div>'
-            )
-        if rows:
-            score_html = f'<div class="score-section"><div class="score-label">📊 技术面评分</div>{"".join(rows)}</div>'
+        stock_results = tr.get("stock_results", [])
+        active = [r for r in stock_results if not r.get("excluded")]
+        all_missing = all(r.get("quote_missing", False) for r in active) if active else True
+        if all_missing:
+            # 盘前/数据缺失 → 简洁MA状态
+            ma_rows = []
+            for r in active:
+                ma_status = ""
+                for sig in r["signals"]:
+                    if sig.get("type") == "ma_position" and "detail" in sig:
+                        ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                        break
+                note = ma_status if ma_status else ("K线可用" if r.get("kline_available") else "待确认")
+                ma_rows.append(
+                    f'<div class="score-row">'
+                    f'<span class="score-name">{r["name"]}</span>'
+                    f'<span class="score-ma" style="color:#999;">⏳ {note}</span>'
+                    f'</div>'
+                )
+            if ma_rows:
+                score_html = f'<div class="score-section"><div class="score-label">📊 技术面（盘前·待确认）</div>{"".join(ma_rows)}</div>'
+        else:
+            rows = []
+            for r in active:
+                score = r["technical_score"]
+                sc = _score_color(score)
+                ma_status = ""
+                for sig in r["signals"]:
+                    if sig.get("type") == "ma_position" and "detail" in sig:
+                        ma_status = _ma_status_short(sig["detail"].get("status", ""))
+                        break
+                rows.append(
+                    f'<div class="score-row">'
+                    f'<span class="score-name">{r["name"]}</span>'
+                    f'<span class="score-bar-wrap"><span class="score-bar" style="width:{score}%;background:{sc};"></span></span>'
+                    f'<span class="score-val" style="color:{sc};">{score}</span>'
+                    f'<span class="score-ma">{ma_status}</span>'
+                    f'</div>'
+                )
+            if rows:
+                score_html = f'<div class="score-section"><div class="score-label">📊 技术面评分</div>{"".join(rows)}</div>'
 
     return f"""
     <div class="rec-card" style="border-left-color:{color};">

@@ -426,11 +426,31 @@ class TechnicalFilterEngine:
         """计算技术面综合评分 (0-100)
 
         基础分 50，各维度加减分。
+        盘前/数据缺失时所有关键字段为0 → 不做虚假加减分，返回中性 50。
         """
         score = 50
 
-        # 换手率：1%~5% 最优
+        price = _safe_float(quote.get("price"))
         tr = _safe_float(quote.get("turnover_rate"))
+        chg = _safe_float(quote.get("change_pct"))
+        amp = _safe_float(quote.get("amplitude"))
+        cap_raw = _safe_float(quote.get("circulating_cap"))
+
+        # ── 数据质量检测 ──
+        # 盘前（9:30之前）push2 返回全0 → 所有维度跳过，仅用K线信号
+        data_available = not (
+            price == 0 and tr == 0 and chg == 0
+            and amp == 0 and cap_raw == 0
+        )
+
+        if not data_available:
+            # 无实时行情，仅依赖K线信号打分
+            for sig in kline_signals:
+                bonus = sig.get("score_bonus", 0)
+                score += bonus
+            return max(0, min(100, score))
+
+        # 换手率：1%~5% 最优
         if 1 <= tr <= 5:
             score += 15
         elif 0.5 <= tr < 1:
@@ -439,7 +459,7 @@ class TechnicalFilterEngine:
             score += 5  # 过度活跃，需注意
 
         # 流通市值：越大越稳
-        cap = _safe_float(quote.get("circulating_cap")) / 1e8
+        cap = cap_raw / 1e8
         if cap > 500:
             score += 10
         elif cap > 100:
@@ -448,16 +468,15 @@ class TechnicalFilterEngine:
             score += 3
 
         # 涨跌幅：温和上涨最优
-        chg = abs(_safe_float(quote.get("change_pct")))
-        if chg < 3:
+        chg_abs = abs(chg)
+        if chg_abs < 3:
             score += 8
-        elif chg < 5:
+        elif chg_abs < 5:
             score += 5
-        elif chg > 8:
+        elif chg_abs > 8:
             score -= 5  # 追高成本高
 
         # 振幅：适中最好
-        amp = _safe_float(quote.get("amplitude"))
         if amp < 3:
             score += 5
         elif amp > 10:
@@ -558,6 +577,12 @@ class TechnicalFilterEngine:
         # ── 计算技术评分 ──
         score = self._compute_score(quote, kline_signals)
 
+        # 检测实时行情是否有效（盘前 push2 返回全0）
+        q_price = _safe_float(quote.get("price"))
+        q_chg = _safe_float(quote.get("change_pct"))
+        q_tr = _safe_float(quote.get("turnover_rate"))
+        quote_missing = (q_price == 0 and q_chg == 0 and q_tr == 0)
+
         return {
             "code": code,
             "name": name,
@@ -565,6 +590,7 @@ class TechnicalFilterEngine:
             "excluded": excluded,
             "signals": signals,
             "technical_score": score,
+            "quote_missing": quote_missing,
             "quote": {
                 "price": quote.get("price"),
                 "change_pct": quote.get("change_pct"),
@@ -712,19 +738,36 @@ class TechnicalFilterEngine:
     def get_summary(self, filtered_recs: List[Recommendation]) -> str:
         """生成技术面过滤摘要（Markdown）
 
-        紧凑格式：每标的单行概要，只展示关键评分和状态。
-        详细信息由 formatter 层负责渲染。
+        数据有效时：每标的单行概要，含评分和关键指标。
+        盘前/数据缺失时：仅显示K线信号，不展示虚假评分。
         """
         if not filtered_recs or not self._stats.get("total"):
             return ""
+
+        # ── 检测数据质量 ──
+        all_results = []
+        for rec in filtered_recs:
+            if hasattr(rec, "technical") and rec.technical:
+                all_results.extend(rec.technical.get("stock_results", []))
+        quote_missing_count = sum(1 for r in all_results if r.get("quote_missing", False))
+        kline_available_count = sum(1 for r in all_results if r.get("kline_available", False))
+        all_quotes_missing = (quote_missing_count == len(all_results)) if all_results else True
 
         lines = [
             "## 📋 技术面过滤结果",
             "",
             f"**过滤统计**：检查 {self._stats['total']} 只标的 → "
             f"通过 {self._stats['passed']} | 警告 {self._stats['warned']} | 排除 {self._stats['excluded']}",
-            "",
         ]
+
+        if all_quotes_missing:
+            lines.append("")
+            now = datetime.now()
+            if now.hour < 9 or (now.hour == 9 and now.minute < 30):
+                lines.append("⏳ *盘前运行，实时行情尚未生成，技术评分基于K线历史数据计算。*")
+            else:
+                lines.append("⚠️ *实时行情数据不可用（push2 API 连接异常），以下仅展示K线信号。*")
+        lines.append("")
 
         for rec in filtered_recs:
             lines.append(f"### {rec.sector}")
@@ -735,6 +778,7 @@ class TechnicalFilterEngine:
                     name = r["name"]
                     code = r["code"]
                     score = r["technical_score"]
+                    quote_missing = r.get("quote_missing", False)
 
                     # 状态图标
                     if r["excluded"]:
@@ -763,20 +807,30 @@ class TechnicalFilterEngine:
                             break
 
                     # 单行概要
-                    meta_parts = [f"**{score}**分"]
-                    if ma_status:
-                        meta_parts.append(ma_status)
-                    chg = q.get("change_pct")
-                    if chg is not None:
-                        meta_parts.append(f"{chg:+.2f}%")
-                    cap = q.get("circulating_cap_yi")
-                    if cap:
-                        meta_parts.append(f"流通{cap:.0f}亿")
-                    tr_rate = q.get("turnover_rate")
-                    if tr_rate:
-                        meta_parts.append(f"换手{tr_rate:.1f}%")
-
-                    lines.append(f"- {icon} **{name}**（{code}）| {' · '.join(meta_parts)}")
+                    if quote_missing:
+                        # 不展示虚假的技术评分，只显示K线信号
+                        meta_parts = []
+                        if ma_status:
+                            meta_parts.append(ma_status)
+                        if r.get("kline_available"):
+                            meta_parts.append("K线可用")
+                        if not meta_parts:
+                            meta_parts.append("待盘中确认")
+                        lines.append(f"- {icon} **{name}**（{code}）| {' · '.join(meta_parts)}")
+                    else:
+                        meta_parts = [f"**{score}**分"]
+                        if ma_status:
+                            meta_parts.append(ma_status)
+                        chg = q.get("change_pct")
+                        if chg is not None and chg != 0:
+                            meta_parts.append(f"{chg:+.2f}%")
+                        cap = q.get("circulating_cap_yi")
+                        if cap:
+                            meta_parts.append(f"流通{cap:.0f}亿")
+                        tr_rate = q.get("turnover_rate")
+                        if tr_rate:
+                            meta_parts.append(f"换手{tr_rate:.1f}%")
+                        lines.append(f"- {icon} **{name}**（{code}）| {' · '.join(meta_parts)}")
 
                     # 只在有警告/危险信号时展开详情
                     warn_sigs = [
@@ -787,7 +841,7 @@ class TechnicalFilterEngine:
                         sev_icon = "🟡" if sig["severity"] == "warning" else "🔴"
                         lines.append(f"  {sev_icon} {sig['message']}")
 
-                    # MA 数值
+                    # MA 数值（始终显示，来自K线，独立于push2）
                     if ma_detail:
                         lines.append(f"  > {ma_detail}")
 
