@@ -73,6 +73,20 @@ def _code_to_secid(code: str) -> str:
         return f"0.{code}"
 
 
+def _safe_float(v, default=0.0):
+    """安全转为 float，处理 push2 API 偶尔返回字符串（如 '+4.62%'）的情况"""
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        return float(v)
+    try:
+        # 去掉百分号、加号，处理千分位逗号
+        s = str(v).replace("%", "").replace("+", "").replace(",", "").strip()
+        return float(s) if s and s != "-" else default
+    except (ValueError, TypeError):
+        return default
+
+
 # ── 引擎核心 ─────────────────────────────────────────────────────
 
 
@@ -137,20 +151,20 @@ class TechnicalFilterEngine:
                 code = item.get("f12", "")
                 result[code] = {
                     "name": item.get("f14", ""),
-                    "price": item.get("f2", 0) or 0,
-                    "change_pct": item.get("f3", 0) or 0,
-                    "change_amt": item.get("f4", 0) or 0,
-                    "volume": item.get("f5", 0) or 0,
-                    "turnover_amt": item.get("f6", 0) or 0,
-                    "amplitude": item.get("f7", 0) or 0,
-                    "turnover_rate": item.get("f8", 0) or 0,
-                    "pe": item.get("f9", 0) or 0,
-                    "high": item.get("f15", 0) or 0,
-                    "low": item.get("f16", 0) or 0,
-                    "open": item.get("f17", 0) or 0,
-                    "prev_close": item.get("f18", 0) or 0,
-                    "total_cap": item.get("f20", 0) or 0,
-                    "circulating_cap": item.get("f21", 0) or 0,
+                    "price": _safe_float(item.get("f2", 0)),
+                    "change_pct": _safe_float(item.get("f3", 0)),
+                    "change_amt": _safe_float(item.get("f4", 0)),
+                    "volume": _safe_float(item.get("f5", 0)),
+                    "turnover_amt": _safe_float(item.get("f6", 0)),
+                    "amplitude": _safe_float(item.get("f7", 0)),
+                    "turnover_rate": _safe_float(item.get("f8", 0)),
+                    "pe": _safe_float(item.get("f9", 0)),
+                    "high": _safe_float(item.get("f15", 0)),
+                    "low": _safe_float(item.get("f16", 0)),
+                    "open": _safe_float(item.get("f17", 0)),
+                    "prev_close": _safe_float(item.get("f18", 0)),
+                    "total_cap": _safe_float(item.get("f20", 0)),
+                    "circulating_cap": _safe_float(item.get("f21", 0)),
                 }
             logger.info(f"技术面行情获取: {len(result)}/{len(codes)} 只")
             return result
@@ -416,7 +430,7 @@ class TechnicalFilterEngine:
         score = 50
 
         # 换手率：1%~5% 最优
-        tr = quote.get("turnover_rate", 0) or 0
+        tr = _safe_float(quote.get("turnover_rate"))
         if 1 <= tr <= 5:
             score += 15
         elif 0.5 <= tr < 1:
@@ -425,7 +439,7 @@ class TechnicalFilterEngine:
             score += 5  # 过度活跃，需注意
 
         # 流通市值：越大越稳
-        cap = (quote.get("circulating_cap", 0) or 0) / 1e8
+        cap = _safe_float(quote.get("circulating_cap")) / 1e8
         if cap > 500:
             score += 10
         elif cap > 100:
@@ -434,7 +448,7 @@ class TechnicalFilterEngine:
             score += 3
 
         # 涨跌幅：温和上涨最优
-        chg = abs(quote.get("change_pct", 0) or 0)
+        chg = abs(_safe_float(quote.get("change_pct")))
         if chg < 3:
             score += 8
         elif chg < 5:
@@ -443,7 +457,7 @@ class TechnicalFilterEngine:
             score -= 5  # 追高成本高
 
         # 振幅：适中最好
-        amp = quote.get("amplitude", 0) or 0
+        amp = _safe_float(quote.get("amplitude"))
         if amp < 3:
             score += 5
         elif amp > 10:
@@ -555,7 +569,7 @@ class TechnicalFilterEngine:
                 "price": quote.get("price"),
                 "change_pct": quote.get("change_pct"),
                 "turnover_rate": quote.get("turnover_rate"),
-                "circulating_cap_yi": round((quote.get("circulating_cap", 0) or 0) / 1e8, 1),
+                "circulating_cap_yi": round(_safe_float(quote.get("circulating_cap")) / 1e8, 1),
                 "pe": quote.get("pe"),
             },
             "kline_available": kline_available,
