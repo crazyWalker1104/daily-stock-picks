@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS recommendations (
     report_date     TEXT NOT NULL,
     sector          TEXT NOT NULL,
     confidence      TEXT NOT NULL,
+    strategy        TEXT NOT NULL DEFAULT '',
+    strategy_score  INTEGER NOT NULL DEFAULT 0,
     logic           TEXT NOT NULL,
     catalyst        TEXT NOT NULL,
     risk            TEXT NOT NULL,
@@ -132,14 +134,26 @@ class DatabaseEngine:
     # ── Schema 迁移 ────────────────────────────────────────────
 
     def _migrate_schema(self):
-        """执行建表语句（幂等：IF NOT EXISTS）"""
+        """执行建表 + 增量迁移（幂等）"""
         try:
             conn = self._connect()
             conn.executescript(SCHEMA_SQL)
             conn.commit()
+            # Phase 3.4 增量迁移：为已有 recommendations 表添加 strategy 列
+            self._migrate_add_strategy_columns(conn)
             logger.debug("数据库 schema 就绪")
         except Exception as e:
             logger.warning(f"数据库 schema 迁移失败: {e}")
+
+    def _migrate_add_strategy_columns(self, conn: sqlite3.Connection):
+        """检查并添加 strategy / strategy_score 列（兼容 v3.3 之前的 DB）"""
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(recommendations)")}
+        if "strategy" not in cols:
+            conn.execute("ALTER TABLE recommendations ADD COLUMN strategy TEXT NOT NULL DEFAULT ''")
+            logger.info("数据库迁移: 已添加 recommendations.strategy 列")
+        if "strategy_score" not in cols:
+            conn.execute("ALTER TABLE recommendations ADD COLUMN strategy_score INTEGER NOT NULL DEFAULT 0")
+            logger.info("数据库迁移: 已添加 recommendations.strategy_score 列")
 
     # ── 写操作 ─────────────────────────────────────────────────
 
@@ -185,19 +199,24 @@ class DatabaseEngine:
 
                 # 2. 写入 recommendations + stocks
                 for i, rec in enumerate(report.recommendations):
-                    # 收集 confirmation 和 technical 元数据
+                    # 收集 confirmation / technical / strategy 元数据
                     confirmation = getattr(rec, "confirmation", {}) or {}
                     technical = getattr(rec, "technical", {}) or {}
+                    strategy = getattr(rec, "strategy", "") or ""
+                    strategy_score = getattr(rec, "strategy_score", 0) or 0
 
                     cursor = conn.execute("""
                         INSERT INTO recommendations
-                            (report_date, sector, confidence, logic, catalyst,
-                             risk, sources_json, confirmation_json, technical_json, sort_order)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            (report_date, sector, confidence, strategy, strategy_score,
+                             logic, catalyst, risk, sources_json,
+                             confirmation_json, technical_json, sort_order)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         report.date,
                         rec.sector,
                         rec.confidence,
+                        strategy,
+                        strategy_score,
                         rec.logic,
                         rec.catalyst,
                         rec.risk,
@@ -598,6 +617,109 @@ class DatabaseEngine:
             return None
 
 
+    # ── 策略回测 (Phase 3.4) ────────────────────────────────────
+
+    def get_strategy_stats(self) -> dict:
+        """按策略维度统计胜率和收益率
+
+        Returns:
+            {by_strategy: [{strategy, rec_count, total, tracked, hits, hit_rate, avg_return}],
+             unlabeled_count: int}
+        """
+        if not self.enabled:
+            return {}
+        try:
+            self._migrate_schema()
+            conn = self._connect()
+            rows = conn.execute("""
+                SELECT
+                    r.strategy,
+                    COUNT(DISTINCT r.id) as rec_count,
+                    COUNT(s.id) as total,
+                    SUM(CASE WHEN s.tracking_change_pct IS NOT NULL THEN 1 ELSE 0 END) as tracked,
+                    SUM(CASE WHEN s.tracking_hit = 1 THEN 1 ELSE 0 END) as hits,
+                    ROUND(AVG(CASE WHEN s.tracking_change_pct IS NOT NULL
+                                   THEN s.tracking_change_pct END), 2) as avg_return
+                FROM recommendations r
+                LEFT JOIN stocks s ON s.recommendation_id = r.id
+                WHERE r.strategy != ''
+                GROUP BY r.strategy
+                ORDER BY avg_return DESC
+            """).fetchall()
+
+            # 未标注数量
+            unlabeled = conn.execute(
+                "SELECT COUNT(*) as cnt FROM recommendations WHERE strategy = '' OR strategy IS NULL"
+            ).fetchone()
+
+            return {
+                "by_strategy": [dict(row) for row in rows],
+                "unlabeled_count": unlabeled["cnt"] if unlabeled else 0,
+            }
+        except Exception as e:
+            logger.warning(f"策略统计查询失败: {e}")
+            return {"error": str(e)}
+
+    def backfill_strategies(self, config: dict = None) -> int:
+        """回填已有推荐行的 strategy 字段
+
+        从 technical_json + confidence + catalyst 重新运行策略分类。
+        仅在 strategy 为空时更新。
+
+        Returns:
+            更新行数
+        """
+        try:
+            from src.strategy_classifier import StrategyClassifierEngine
+
+            self._migrate_schema()  # 确保 strategy 列已存在
+            conn = self._connect()
+
+            rows = conn.execute("""
+                SELECT id, confidence, catalyst, logic, sector, technical_json
+                FROM recommendations
+                WHERE strategy = '' OR strategy IS NULL
+            """).fetchall()
+
+            if not rows:
+                logger.info("策略回填: 所有推荐已有标签，跳过")
+                return 0
+
+            engine = StrategyClassifierEngine(config or {})
+            updated = 0
+
+            with conn:
+                for row in rows:
+                    tech = json.loads(row["technical_json"] or "{}")
+                    stock_results = tech.get("stock_results", [])
+
+                    score_data = {
+                        "confidence": row["confidence"],
+                        "catalyst": row["catalyst"],
+                        "logic": row["logic"],
+                        "sector": row["sector"],
+                        "stock_results": stock_results,
+                    }
+
+                    strategy, strategy_score = engine._classify_from_db(score_data)
+
+                    conn.execute(
+                        "UPDATE recommendations SET strategy = ?, strategy_score = ? WHERE id = ?",
+                        (strategy, strategy_score, row["id"]),
+                    )
+                    updated += 1
+
+            logger.info(f"策略回填完成: {updated} 行")
+            return updated
+
+        except ImportError:
+            logger.warning("策略回填失败: strategy_classifier 模块不可用")
+            return 0
+        except Exception as e:
+            logger.warning(f"策略回填失败: {e}")
+            return 0
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 单例 + 便捷函数
 # ═══════════════════════════════════════════════════════════════════
@@ -723,8 +845,12 @@ def _print_report(report: Optional[dict]):
     print(f"  信息源: {', '.join(report.get('sources_used', []))}")
     print()
 
+    STRATEGY_EMOJI = {"追强": "🚀", "抄底": "🎯", "事件驱动": "⚡", "观望": "👀"}
+
     for i, rec in enumerate(report.get("recommendations", []), 1):
-        print(f"  ── 推荐 {i}: {rec['sector']} [{rec['confidence']}信心] ──")
+        strat = rec.get("strategy", "")
+        strat_str = f"  [{STRATEGY_EMOJI.get(strat, '')} {strat}]" if strat else ""
+        print(f"  ── 推荐 {i}: {rec['sector']} [{rec['confidence']}信心]{strat_str} ──")
         print(f"  逻辑: {rec['logic'][:120]}")
         print(f"  催化: {rec['catalyst'][:120]}")
         print(f"  风险: {rec['risk'][:120]}")
@@ -790,6 +916,72 @@ def _load_config() -> dict:
     return {}
 
 
+def _print_strategy_stats(stats: dict):
+    """格式化打印策略回测统计"""
+    STRATEGY_EMOJI = {"追强": "🚀", "抄底": "🎯", "事件驱动": "⚡", "观望": "👀"}
+
+    print("\n" + "=" * 65)
+    print("  📐 策略回测 — 按策略维度胜率对比 (Phase 3.4)")
+    print("=" * 65)
+
+    if stats.get("error"):
+        print(f"  ❌ {stats['error']}\n")
+        return
+
+    by_strategy = stats.get("by_strategy", [])
+    if not by_strategy:
+        print("  (暂无策略数据，运行 python -m src.database --backfill-strategy 回填)\n")
+        return
+
+    print(f"  {'策略':<12s} {'推荐':>4s} {'标的':>4s} {'可追踪':>6s} {'胜率':>8s} {'均收益':>10s}")
+    print("  " + "-" * 55)
+
+    total_recs = 0
+    total_tracked = 0
+    total_hits = 0
+    for row in by_strategy:
+        strat = row["strategy"]
+        se = STRATEGY_EMOJI.get(strat, "📌")
+        rec_count = row["rec_count"] or 0
+        tracked = row["tracked"] or 0
+        hits = row["hits"] or 0
+        hit_rate = f"{hits / tracked:.0%}" if tracked > 0 else "—"
+        avg_ret = f"{row['avg_return']:+.2f}%" if row["avg_return"] is not None else "—"
+
+        total_recs += rec_count
+        total_tracked += tracked
+        total_hits += hits
+
+        print(f"  {se} {strat:<8s} {rec_count:>4d} {row['total']:>4d} "
+              f"{tracked:>6d} {hit_rate:>8s} {avg_ret:>10s}")
+
+    print("  " + "-" * 55)
+    overall_rate = f"{total_hits / total_tracked:.0%}" if total_tracked > 0 else "—"
+    print(f"  {'合计':<12s} {total_recs:>4d} {'':>4s} {total_tracked:>6d} {overall_rate:>8s}")
+    print()
+
+    # 对比分析
+    if len(by_strategy) >= 2:
+        print("  ── 策略对比 ──")
+        strategies_with_data = [
+            r for r in by_strategy if (r["tracked"] or 0) >= 2
+        ]
+        if strategies_with_data:
+            best = max(strategies_with_data, key=lambda r: r["avg_return"] or -999)
+            worst = min(strategies_with_data, key=lambda r: r["avg_return"] or 999)
+            bse = STRATEGY_EMOJI.get(best["strategy"], "📌")
+            wse = STRATEGY_EMOJI.get(worst["strategy"], "📌")
+            print(f"  🏆 最优: {bse} {best['strategy']} 均收益 {best['avg_return']:+.2f}% "
+                  f"(胜率 {best['hits']}/{best['tracked']})")
+            print(f"  ⚠️  最弱: {wse} {worst['strategy']} 均收益 {worst['avg_return']:+.2f}% "
+                  f"(胜率 {worst['hits']}/{worst['tracked']})")
+
+    unlabeled = stats.get("unlabeled_count", 0)
+    if unlabeled > 0:
+        print(f"\n  💡 {unlabeled} 条推荐尚无策略标签，运行 --backfill-strategy 回填")
+    print()
+
+
 if __name__ == "__main__":
     import argparse
     import sys
@@ -799,7 +991,7 @@ if __name__ == "__main__":
         import io
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-    parser = argparse.ArgumentParser(description="推荐数据库查询工具 (Phase 3.1)")
+    parser = argparse.ArgumentParser(description="推荐数据库查询工具 (Phase 3.1 / 3.4)")
     parser.add_argument("--stats", action="store_true", help="显示全量统计数据")
     parser.add_argument("--history", type=int, default=None, metavar="N",
                         help="显示最近N天记录 (默认7)")
@@ -807,13 +999,26 @@ if __name__ == "__main__":
                         help="查询指定日期的推荐详情")
     parser.add_argument("--recent", action="store_true",
                         help="显示最近一次推荐详情")
+    parser.add_argument("--strategy", action="store_true",
+                        help="Phase 3.4: 按策略维度对比胜率")
+    parser.add_argument("--backfill-strategy", action="store_true",
+                        help="Phase 3.4: 回填已有推荐行的策略标签")
     args = parser.parse_args()
 
     config = _load_config()
     engine = get_engine(config)
 
+    # Phase 3.4: 策略回填（先执行，因为后续查询依赖它）
+    if args.backfill_strategy:
+        n = engine.backfill_strategies(config)
+        print(f"\n  策略回填完成: {n} 行已更新\n")
+
+    if args.strategy:
+        _print_strategy_stats(engine.get_strategy_stats())
+
     # 默认行为：显示历史
-    show_default = not (args.stats or args.date or args.recent)
+    show_default = not (args.stats or args.date or args.recent
+                        or args.strategy or args.backfill_strategy)
 
     if args.stats:
         _print_stats(engine.get_stats())

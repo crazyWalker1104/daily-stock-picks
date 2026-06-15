@@ -23,11 +23,13 @@ python -m src.main --date 2026-06-01
 export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897
 pip install -r requirements.txt
 
-# 数据库查询 (Phase 3.1)
+# 数据库查询 (Phase 3.1 / 3.4)
 python -m src.database --stats          # 全量统计（胜率、板块、信心度）
 python -m src.database --history 7      # 最近N天记录摘要
 python -m src.database --date 2026-06-01  # 指定日期报告详情
 python -m src.database --recent         # 最近一次报告详情
+python -m src.database --strategy       # 策略回测：按追强/抄底/事件驱动维度的胜率对比
+python -m src.database --backfill-strategy  # 回填已有推荐行的策略标签
 
 # 因子有效性分析 (Phase 3.2)
 python -m src.factor_analyzer               # CLI表格（默认）
@@ -49,7 +51,7 @@ python -m src.factor_analyzer --format json      # JSON输出
 | **追踪器** | [src/tracker.py](src/tracker.py) | 昨日推荐vs今日行情对比，胜率/均收益统计 | 新增追踪维度时 |
 | **确认引擎** | [src/confirmation.py](src/confirmation.py) | 资金流向×新闻情绪双重确认，信心度调整（Phase 2.1） | 调整确认逻辑时 |
 | **技术面过滤** | [src/technical_filter.py](src/technical_filter.py) | 实时行情+K线技术指标过滤，评分×信心度（Phase 2.2） | 调整过滤逻辑时 |
-| **推荐数据库** | [src/database.py](src/database.py) | SQLite持久化+历史查询+统计分析+CLI工具（Phase 3.1） | 调整统计维度时 |
+| **推荐数据库** | [src/database.py](src/database.py) | SQLite持久化+历史查询+统计+策略回测+CLI工具（Phase 3.1/3.4） | 调整统计维度时 |
 | **因子分析** | [src/factor_analyzer.py](src/factor_analyzer.py) | 因子有效性检验：相关性+IC+分组+分位数+排名（Phase 3.2） | 累积20+追踪样本后 |
 | **策略分类** | [src/strategy_classifier.py](src/strategy_classifier.py) | 规则打分三维归类：追强/抄底/事件驱动（Phase 3.3） | 调整权重时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
@@ -186,6 +188,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-12 | v2.5 | Phase 3.4: 策略回测（按策略维度胜率对比 + DB策略回填 + --strategy CLI）|
 | 2026-06-10 | v2.4 | Phase 3.3: 策略分层（追强/抄底/事件驱动三维规则打分+管线注入+四格式输出）|
 | 2026-06-10 | — | fix: _safe_float() 处理push2 API返回字符串类型数值 |  
 | 2026-06-05 | v2.3 | Phase 3.2: 因子有效性检验（相关性+IC+分组对比+分位数+排名+CLI工具） |
@@ -214,6 +217,7 @@ Daily Stock Picks/
 | SQLite 数据库 | ✅ 新增 | 推荐持久化+历史查询+统计分析+CLI工具（Phase 3.1） |
 | 因子有效性检验 | ✅ 新增 | 相关性+IC+分组+分位数+因子排名（Phase 3.2） |
 | 策略分层 | ✅ 新增 | 追强/抄底/事件驱动三维规则打分（Phase 3.3） |
+| 策略回测 | ✅ 新增 | 按策略维度胜率对比统计 + DB回填（Phase 3.4） |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
 | QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
 | 163邮箱推送 | ✅ 就绪 | SMTP 465/SSL，授权码登录 |
@@ -230,11 +234,12 @@ Daily Stock Picks/
 |:---|:---|:---|:---|
 | Phase 1 | 2026-05-31 ~ 06-07 | 基础夯实：市场数据注入 + 次日追踪 + akshare | [DEVLOG.md](DEVLOG.md) |
 | Phase 2 | 2026-06-03 ~ 06-04 | 量化因子：资金×情绪确认 ✅ + 技术面过滤 ✅ + 多因子打分 ✅ | [DEVLOG.md](DEVLOG.md) |
-| Phase 3 | 2026-06-04 ~ 06-21 | 数据沉淀：SQLite推荐库 ✅ + 因子有效性检验 ✅ + 策略分层 ✅ | [DEVLOG.md](DEVLOG.md) |
+| Phase 3 | 2026-06-04 ~ 06-21 | 数据沉淀：SQLite推荐库 ✅ + 因子检验 ✅ + 策略分层 ✅ + 策略回测 ✅ | [DEVLOG.md](DEVLOG.md) |
 | Phase 4 | 2026-06-22+ | 策略进化：新数据源 + 行业热力图 + 报告升级 | [DEVLOG.md](DEVLOG.md) |
 
 **当前优先事项（P0）：**
-- [ ] Phase 3.4: 策略进化 — 回测框架 + 策略胜率对比
+- [ ] 数据源稳定性 — push2/akshare 连接频繁断开，需增加重试机制或替代源
+- [x] Phase 3.4: 策略回测 — 按策略维度胜率对比 ✅
 - [ ] GitHub Pages 启用 — 仓库 Settings → Pages → main /docs
 - [x] Phase 3.1-3.3 全部完成：SQLite数据库 + 因子分析 + 策略分层
 - [x] CI git push 已修复（reset--soft 替代 rebase），待下次交易日验证

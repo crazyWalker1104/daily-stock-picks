@@ -19,10 +19,16 @@ on:
 permissions:
   contents: write
 
+# 防止双 cron (8:30 + 9:35) 并发竞态
+# cancel-in-progress: false → 第二个 run 排队等待，不取消第一个
+concurrency:
+  group: daily-push
+  cancel-in-progress: false
+
 jobs:
   daily-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25  # 15→25分钟，给AI分析+DeepSeek API+推送更多时间
 
     steps:
       - name: 检出代码
@@ -89,30 +95,43 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 拉取远程最新，用 reset 代替 rebase 避免双轮 cron 文件冲突
-          git fetch origin main
-          git checkout main
-          git reset --soft origin/main
-
-          # 添加 docs 和 output 目录变更
           git add docs/ output/
 
           if git diff --cached --quiet; then
             echo "无变更，跳过提交"
-          else
-            git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || {
-              echo "提交失败，检查是否有变更"
-              exit 1
-            }
-            git push origin main || {
-              echo "推送失败，尝试重新拉取并推送"
-              git fetch origin main
+            exit 0
+          fi
+
+          git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]"
+
+          # 带指数退避的重试推送（最多 5 次，解决网络抖动导致的偶发失败）
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+
+            # 尝试 rebase（保留本地 commit 在远程之上）
+            if git rebase origin/main 2>/dev/null; then
+              if git push origin main; then
+                echo "✅ 推送成功 (attempt $i)"
+                exit 0
+              fi
+            else
+              # rebase 冲突 → abort，用 reset--soft 兜底
+              git rebase --abort 2>/dev/null || true
               git reset --soft origin/main
               git add docs/ output/
               git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || true
-              git push origin main
-            }
-          fi
+              if git push origin main; then
+                echo "✅ 推送成功 (reset 方式, attempt $i)"
+                exit 0
+              fi
+            fi
+
+            echo "⏳ 推送失败，$((i * 10))s 后重试 ($i/5)..."
+            sleep $((i * 10))
+          done
+
+          echo "❌ 推送最终失败（已重试 5 次）"
+          exit 1
 
       - name: 失败告警
         if: failure()

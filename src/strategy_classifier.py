@@ -267,6 +267,30 @@ class StrategyClassifierEngine:
             "advice": self._ADVICE.get(strategy, ""),
         }
 
+    def _classify_from_db(self, data: dict) -> tuple:
+        """从数据库行数据做策略分类（无需 Recommendation 对象）
+
+        Args:
+            data: {"confidence": str, "catalyst": str, "logic": str,
+                   "sector": str, "stock_results": list}
+
+        Returns:
+            (strategy: str, strategy_score: int)
+        """
+        # 构造轻量级代理对象，提供 classify() 需要的属性
+        class _RecProxy:
+            pass
+        proxy = _RecProxy()
+        proxy.confidence = data.get("confidence", "中")
+        proxy.catalyst = data.get("catalyst", "")
+        proxy.logic = data.get("logic", "")
+        proxy.sector = data.get("sector", "")
+        proxy.stocks = []
+        proxy.technical = {"stock_results": data.get("stock_results", [])}
+
+        result = self.classify(proxy)  # type: ignore
+        return result["strategy"], result["score"]
+
     def apply(self, recommendations: List[Recommendation]) -> List[Recommendation]:
         """批量分类并注入元数据到每条推荐
 
