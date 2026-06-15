@@ -3,10 +3,9 @@ name: 每日A股推荐推送
 on:
   schedule:
     # 每个交易日 8:30 CST (0:30 UTC) — 盘前预跑
-    # 注意：GitHub Actions cron 使用 UTC时间 (CST = UTC+8)
-    - cron: '30 0 * * 1-5'
     # 每个交易日 9:35 CST (1:35 UTC) — 开盘后补充运行
-    # push2.eastmoney.com 开盘前大面积断连，9:30 后数据就绪
+    # GitHub Actions cron 使用 UTC 时间 (CST = UTC+8)
+    - cron: '30 0 * * 1-5'
     - cron: '35 1 * * 1-5'
   workflow_dispatch:
     inputs:
@@ -15,12 +14,11 @@ on:
         required: false
         default: ''
 
-# 必须显式声明写入权限，否则 git push 会失败
 permissions:
   contents: write
 
 # 防止双 cron (8:30 + 9:35) 并发竞态
-# cancel-in-progress: false → 第二个 run 排队等待，不取消第一个
+# cancel-in-progress: false → 第二个 run 排队等待
 concurrency:
   group: daily-push
   cancel-in-progress: false
@@ -28,14 +26,16 @@ concurrency:
 jobs:
   daily-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 25  # 15→25分钟，给AI分析+DeepSeek API+推送更多时间
+    timeout-minutes: 25
 
     steps:
+      # ── Step 1: 检出 ──────────────────────────────────────
       - name: 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ── Step 2: Python 环境 ────────────────────────────────
       - name: 设置 Python
         uses: actions/setup-python@v5
         with:
@@ -46,6 +46,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ── Step 3: 交易日检查 ────────────────────────────────
       - name: 检查交易日
         id: check_trading
         run: |
@@ -55,12 +56,9 @@ jobs:
               import akshare as ak
               df = ak.tool_trade_date_hist_sina()
               today = datetime.now().strftime('%Y-%m-%d')
-              # 修复1: .astype(str) 只用于过滤不改变原列类型，取 .values 时仍是 datetime64
-              # 需显式转为字符串再做 in 比较
               trade_dates = df['trade_date'].astype(str).values
               recent_dates = [d for d in trade_dates if d.startswith(today[:7])]
               is_trading = today in recent_dates
-              # 修复2: Python bool str() 输出 True/False（大写），GitHub Actions 条件比较用小写 true/false
               print(f'TRADING_DAY={str(is_trading).lower()}')
               print(f'DATE={today}')
           except Exception as e:
@@ -71,7 +69,11 @@ jobs:
           cat trading_check.txt
           cat trading_check.txt >> $GITHUB_OUTPUT
 
+      # ── Step 4: 运行推荐系统 ──────────────────────────────
+      # continue-on-error: true → 管线异常不阻断后续 git push
       - name: 运行推荐系统
+        id: pipeline
+        continue-on-error: true
         if: steps.check_trading.outputs.TRADING_DAY == 'true' || github.event_name == 'workflow_dispatch'
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -85,40 +87,65 @@ jobs:
           WECHAT_SENDKEY: ${{ secrets.WECHAT_SENDKEY }}
         run: |
           if [ -n "${{ github.event.inputs.date }}" ]; then
-            python -m src.main --date "${{ github.event.inputs.date }}"
+            python -m src.main --date "${{ github.event.inputs.date }}" 2>&1
           else
-            python -m src.main
+            python -m src.main 2>&1
           fi
+          echo "PIPELINE_EXIT=$?" >> pipeline_status.txt
+          cat pipeline_status.txt
 
+      # ── Step 5: 诊断日志 ────────────────────────────────────
+      - name: 诊断日志
+        if: (!cancelled())
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  诊断信息"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "交易日: ${{ steps.check_trading.outputs.TRADING_DAY }}"
+          echo "日期:   ${{ steps.check_trading.outputs.DATE }}"
+          echo "触发:   ${{ github.event_name }}"
+          echo "管线结果: ${{ steps.pipeline.outcome }}"
+          echo ""
+          echo "--- output/ 目录 ---"
+          ls -la output/ 2>/dev/null || echo "  (空)"
+          echo ""
+          echo "--- docs/ 目录 ---"
+          ls -la docs/*.html 2>/dev/null || echo "  (空)"
+
+      # ── Step 6: 提交网页报告 ───────────────────────────────
+      # if: !cancelled() → 即使管线失败也尝试提交（有文件变更才实际提交）
       - name: 提交网页报告
+        id: git_push
+        if: (!cancelled()) && (steps.check_trading.outputs.TRADING_DAY == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add docs/ output/
+          git add docs/ output/ data/
 
-          if git diff --cached --quiet; then
+          if git diff --cached --quiet && git diff --quiet; then
             echo "无变更，跳过提交"
             exit 0
           fi
 
-          git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]"
+          git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || {
+            echo "提交失败（可能无变更），跳过"
+            exit 0
+          }
 
-          # 带指数退避的重试推送（最多 5 次，解决网络抖动导致的偶发失败）
+          # 带指数退避的重试推送（最多 5 次）
           for i in 1 2 3 4 5; do
             git fetch origin main
 
-            # 尝试 rebase（保留本地 commit 在远程之上）
             if git rebase origin/main 2>/dev/null; then
               if git push origin main; then
                 echo "✅ 推送成功 (attempt $i)"
                 exit 0
               fi
             else
-              # rebase 冲突 → abort，用 reset--soft 兜底
               git rebase --abort 2>/dev/null || true
               git reset --soft origin/main
-              git add docs/ output/
+              git add docs/ output/ data/
               git commit -m "📊 更新每日A股速递 [${{ steps.check_trading.outputs.DATE }}]" || true
               if git push origin main; then
                 echo "✅ 推送成功 (reset 方式, attempt $i)"
@@ -126,14 +153,24 @@ jobs:
               fi
             fi
 
-            echo "⏳ 推送失败，$((i * 10))s 后重试 ($i/5)..."
-            sleep $((i * 10))
+            if [ $i -lt 5 ]; then
+              WAIT=$((i * 10))
+              echo "⏳ 推送失败，${WAIT}s 后重试 ($i/5)..."
+              sleep $WAIT
+            fi
           done
 
           echo "❌ 推送最终失败（已重试 5 次）"
           exit 1
 
-      - name: 失败告警
-        if: failure()
+      # ── Step 7: 失败告警 ────────────────────────────────────
+      - name: 管线异常告警
+        if: steps.pipeline.outcome == 'failure'
         run: |
-          echo "推荐系统执行失败，请检查日志"
+          echo "⚠️  推荐管线执行异常，但网页报告步骤已尝试执行"
+          echo "请检查上方日志排查 API/网络问题"
+
+      - name: 推送异常告警
+        if: steps.git_push.outcome == 'failure'
+        run: |
+          echo "⚠️  git push 最终失败，请检查 GitHub 连接或手动推送"
