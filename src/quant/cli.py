@@ -74,6 +74,8 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="干运行（仅分析不推送）")
     parser.add_argument("--channels", dest="channels", metavar="CHANNELS",
                         help="推送通道 (逗号分隔: wechat,email)")
+    parser.add_argument("--verbose", "-v", dest="verbose", action="store_true",
+                        help="显示因子评分明细")
 
     parser.set_defaults(action=None)
     return parser
@@ -115,7 +117,7 @@ def main(argv: list = None):
 
         if signal:
             print()
-            print(engine.format_signal(signal))
+            print(engine.format_signal(signal, verbose=args.verbose))
 
             # 风控检查
             pos = engine.tracker.position
@@ -197,7 +199,7 @@ def main(argv: list = None):
         signal = engine.analyze(symbol=symbol, symbol_name=name)
 
         if signal:
-            print(engine.format_signal(signal))
+            print(engine.format_signal(signal, verbose=args.verbose))
             print()
             print(engine.status_text())
 

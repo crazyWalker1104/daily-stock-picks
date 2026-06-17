@@ -458,37 +458,75 @@ class QuantEngine:
         return "\n".join(lines)
 
     @staticmethod
-    def format_signal(signal: QuantSignal) -> str:
-        """格式化信号为可读文本"""
+    def format_signal(signal: QuantSignal, verbose: bool = False) -> str:
+        """格式化信号为可读文本
+
+        Args:
+            signal: 量化信号对象
+            verbose: True=显示因子评分明细
+        """
         emoji = SIGNAL_EMOJI.get(signal.signal, "❓")
         signal_cn = SIGNAL_CN.get(signal.signal, "未知")
         regime_cn = REGIME_CN.get(signal.regime, "未知")
         mode_cn = MODE_CN.get(signal.mode, "未知")
 
+        # 评分条
+        bar_len = 20
+        bar_fill = int(abs(signal.total_score) / 100 * bar_len)
+        if signal.total_score >= 0:
+            bar = "█" * bar_fill + "░" * (bar_len - bar_fill)
+        else:
+            bar = "░" * (bar_len - bar_fill) + "█" * bar_fill
+
         lines = [
-            f"  {emoji} 信号: {signal_cn}  |  "
-            f"市场: {regime_cn}  |  策略: {mode_cn}",
-            f"  综合评分: {signal.total_score:.0f}/100  "
+            f"  {emoji} 信号: {signal_cn}  |  市场: {regime_cn}  |  策略: {mode_cn}",
+            f"  评分 [{bar}] {signal.total_score:.0f}/100  "
             f"(买入 {signal.buy_score:.0f} | 卖出 {signal.sell_score:.0f})",
         ]
 
         if signal.position_advice > 0:
-            lines.append(f"  建议仓位: {signal.position_advice*100:.0f}%  |  "
-                         f"入场: {signal.suggested_entry:.2f}  |  "
-                         f"止损: {signal.stop_loss:.2f}  |  "
-                         f"止盈: {signal.take_profit:.2f}")
+            lines.append(
+                f"  仓位: {signal.position_advice*100:.0f}%  |  "
+                f"入场: {signal.suggested_entry:.2f}  |  "
+                f"止损: {signal.stop_loss:.2f}  |  "
+                f"止盈: {signal.take_profit:.2f}"
+            )
 
-        lines.append(f"  风险: {signal.risk_level}  |  "
-                     f"理由: {signal.reasoning}")
+        lines.append(f"  理由: {signal.reasoning}")
 
         # 指标摘要
         ind = signal.indicators
         if ind:
             rsi = ind.get("rsi14", 0)
-            macd = ind.get("macd_hist", 0)
+            macd_h = ind.get("macd_hist", 0)
             adx = ind.get("adx", 0)
             vr = ind.get("volume_ratio", 1)
-            lines.append(f"  RSI:{rsi:.0f}  MACD:{macd:.2f}  "
-                         f"ADX:{adx:.0f}  量比:{vr:.2f}")
+            ma5 = ind.get("ma5", 0)
+            ma20 = ind.get("ma20", 0)
+            close = signal.current_price
+            ma_status = "MA5>MA20✓" if ma5 > ma20 else "MA5<MA20✗"
+            lines.append(
+                f"  RSI:{rsi:.0f} | MACD柱:{macd_h:+.2f} | ADX:{adx:.0f} | "
+                f"量比:{vr:.2f} | {ma_status} | 现价:{close:.2f}"
+            )
+
+        # 因子评分明细 (verbose 模式)
+        if verbose and signal.score_details:
+            buy_items = {k: v for k, v in signal.score_details.items()
+                         if not k.startswith("sell_") and k != "sell_details"}
+            sell_details = signal.score_details.get("sell_details", {})
+
+            if buy_items:
+                lines.append("")
+                lines.append("  📈 买入因子:")
+                for name, score in sorted(buy_items.items(), key=lambda x: -x[1]):
+                    if score > 0:
+                        lines.append(f"    +{score:2.0f}  {name}")
+
+            if sell_details:
+                lines.append("  📉 卖出因子:")
+                for name, score in sorted(sell_details.items(), key=lambda x: -x[1]):
+                    if score > 0:
+                        lines.append(f"    -{score:2.0f}  {name}")
 
         return "\n".join(lines)
