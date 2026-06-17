@@ -42,6 +42,11 @@ class BasePusher(ABC):
         """执行推送，返回 True/False"""
         ...
 
+    def send_message(self, title: str, body: str) -> bool:
+        """发送通用消息（title + body），供量化模块等非 DailyReport 场景使用。
+        子类可按需覆写。默认返回 False（不支持）。"""
+        return False
+
 
 # ═══════════════════════════════════════════════════════════
 # 邮箱推送（QQ邮箱 + 163邮箱）
@@ -64,30 +69,29 @@ class EmailPusher(BasePusher):
         return bool(self.user and self.password and self.recipient)
 
     def send(self, report: DailyReport) -> bool:
-        """发送邮件"""
+        """发送邮件 — 委托给 send_message()"""
+        subject = f"📊 每日A股速递 | {report.date}"
+        body_html = format_email_html(report)
+        return self.send_message(subject, body_html)
+
+    def send_message(self, title: str, body_html: str) -> bool:
+        """发送原始邮件（title + HTML body），供量化等非 DailyReport 场景使用"""
         if not self.is_configured():
             logger.warning("邮箱未配置，跳过邮件推送")
             return False
 
-        subject = f"📊 每日A股速递 | {report.date}"
-
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
+        msg["Subject"] = title
         msg["From"] = self.user
         msg["To"] = self.recipient
-
-        # 纯文本 + 精美HTML双版本
-        msg.attach(MIMEText(format_plain(report), "plain", "utf-8"))
-        msg.attach(MIMEText(format_email_html(report), "html", "utf-8"))
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
 
         try:
             if self.port == 465:
-                # SSL直连（163邮箱推荐）
                 with smtplib.SMTP_SSL(self.host, self.port, timeout=15) as server:
                     server.login(self.user, self.password)
                     server.sendmail(self.user, [self.recipient], msg.as_string())
             else:
-                # STARTTLS升级（QQ邮箱推荐 587）
                 with smtplib.SMTP(self.host, self.port, timeout=15) as server:
                     server.starttls()
                     server.login(self.user, self.password)
@@ -123,13 +127,16 @@ class WeChatPusher(BasePusher):
         return bool(self.sendkey)
 
     def send(self, report: DailyReport) -> bool:
-        """通过Server酱发送微信推送"""
+        """通过Server酱发送 — 委托给 send_message()"""
+        title = f"📊 每日A股速递 | {report.date}"
+        body = format_markdown(report)
+        return self.send_message(title, body)
+
+    def send_message(self, title: str, body: str) -> bool:
+        """发送原始微信消息（title + markdown body）"""
         if not self.is_configured():
             logger.warning("微信推送未配置 (WECHAT_SENDKEY为空)，跳过")
             return False
-
-        title = f"📊 每日A股速递 | {report.date}"
-        body = format_markdown(report)
 
         try:
             resp = _push_session.post(

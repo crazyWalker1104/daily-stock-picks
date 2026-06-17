@@ -1,6 +1,6 @@
 # 开发日志 · Daily Stock Picks
 
-> 最后更新：2026-06-12 | 当前阶段：Phase 3 — 数据沉淀（3.1 ✅，3.2 ✅，3.3 ✅，3.4 ✅）
+> 最后更新：2026-06-17 | 当前阶段：Phase 5 — 量化跟投模块 ✅（3.1-3.4 ✅ 全部完成）
 
 ---
 
@@ -63,7 +63,7 @@
 | 4.3 | 邮件报告增加回顾区块 | ⏳ | 用户看到的不只是推荐，还有效果 |
 | 4.4 | GitHub Pages 报告美化 | ⏳ | 匹配邮件模板的卡片风格 |
 
-### Phase 5：量化跟投模块 `📋 已规划 · 待启动`
+### Phase 5：量化跟投模块 `✅ 已完成 · 2026-06-15`
 
 > 详细计划见 `C:\Users\86151\.claude\plans\scalable-chasing-lynx.md`
 
@@ -73,19 +73,19 @@
 - 资金：1-3万 | 选股：系统推荐→用户确认 | 风格：市场自适应（趋势/震荡切换）
 - 做空：减仓/空仓代替 | 周期：波段 1-4 周
 
-**模块结构**：`src/quant/`（完全独立，复用 pusher）
+**模块结构**：`src/quant/`（完全独立，复用 pusher，11个文件共约 2200 行）
 
 | # | 任务 | 状态 | 文件 | 说明 |
 |:---|:---|:---|:---|:---|
-| 5.1 | 指标计算引擎 | ⏳ | `indicators.py` + `models.py` | MACD/RSI/布林/KDJ/ATR/ADX 纯Python |
-| 5.2 | 市场状态识别 | ⏳ | `regime.py` | 趋势市 vs 震荡市自适应切换 |
-| 5.3 | 信号生成引擎 | ⏳ | `signals.py` | 多因子规则打分 → 开仓/加仓/持有/减仓/清仓 |
-| 5.4 | 仓位+风控 | ⏳ | `risk.py` | 初始30%仓位、-5%硬止损、移动止盈、15%熔断 |
-| 5.5 | 持仓跟踪 | ⏳ | `tracker.py` | 入场价、浮动盈亏、交易历史 JSON存储 |
-| 5.6 | 标的筛选 | ⏳ | `stock_picker.py` | 从DB推荐池量化选Top3候选 |
-| 5.7 | 历史回测 | ⏳ | `backtest.py` | 单标的回测（含T+1/印花税/手续费） |
-| 5.8 | CLI + 主引擎 | ⏳ | `engine.py` + `cli.py` | 编排 + `--pick/--signal/--status/--backtest/--watch` |
-| 5.9 | 推送集成 | ⏳ | 复用 `pusher.py` | 盘后信号+选股推荐+紧急告警（微信优先） |
+| 5.1 | 指标计算引擎 | ✅ | `indicators.py` + `models.py` | MACD/RSI/布林/KDJ/ATR/ADX/OBV 纯Python |
+| 5.2 | 市场状态识别 | ✅ | `regime.py` | 趋势市 vs 震荡市自适应切换（均线排列+ADX） |
+| 5.3 | 信号生成引擎 | ✅ | `signals.py` | 多因子规则打分 → 开仓/加仓/持有/减仓/清仓/观望 |
+| 5.4 | 仓位+风控 | ✅ | `risk.py` | 初始30%仓位、-5%硬止损、移动止盈、15%熔断、T+1 |
+| 5.5 | 持仓跟踪 | ✅ | `tracker.py` | 入场价、浮动盈亏、交易历史 JSON存储（data/quant/） |
+| 5.6 | 标的筛选 | ✅ | `stock_picker.py` | 从DB推荐池量化选Top3候选（技术35%+资金25%+趋势20%+基本20%） |
+| 5.7 | 历史回测 | ✅ | `backtest.py` | 单标的回测（含T+1/印花税/手续费/夏普/回撤） |
+| 5.8 | CLI + 主引擎 | ✅ | `engine.py` + `cli.py` | 编排 + `--pick/--symbol/--status/--backtest/--watch/--execute` |
+| 5.9 | 推送集成 | ✅ | `formatter.py` + `pusher.py` + `daily_runner.py` | 盘后信号(微信)+日结(邮件)+候选推荐+量化CI |
 
 **信号类型**：🟢开仓 🔵加仓 ⚪持有 🟠减仓 🔴清仓 ⏸️观望
 
@@ -361,6 +361,45 @@
 - 06-12: 61条新闻 → 5条推荐，策略：🚀追强3 · 🎯抄底1 · 👀观望1
 - 06-11 追踪: 胜率100% 均收益+1.98% 🎉
 - 技术评分分化明显: 50~95分，MA位置/量能信号正常
+
+---
+
+### 2026-06-17 (周三) — v3.1
+
+**完成事项：**
+- 📡 **今日推送**：手动运行 `python -m src.main` 完成 6/17 推送
+  - 采集 61条 → AI推荐 4条板块（半导体设备/储能/AI算力/光伏航天）
+  - 推送结果：email ✅ · wechat ✅ · web ✅
+- 🐛 **量化模块网络修复**：
+  - **K线数据源切换**：`stock_zh_a_hist`（eastmoney push2his SSL重协商 -> RemoteDisconnected）→ `stock_zh_a_daily`（新浪源）稳定可靠
+  - **日期范围修复**：`fetch_klines()` 原来只请求当天数据（无法计算指标），已修正为请求 `days+30` 天历史数据
+  - **代理绕过**：`src/quant/__init__.py` + `src/main.py` 最顶部设置 `NO_PROXY='*'`，避免 urllib3 缓存 Windows 系统代理
+  - 新增 `_symbol_to_ak()` 辅助函数：600036→sh600036, 000001→sz000001
+- 🐛 **回测修复**：`signals.py:_score_to_signal()` 修复 `indicators` 未定义变量引用错误
+- 🧪 **全命令验证**：
+  - `--pick` ✅ 60候选 → Top3: 源杰科技84/新相微78/上海瀚讯73
+  - `--symbol 600036` ✅ 152条K线 → WAIT信号(过渡期/防御模式)
+  - `--daily-run --dry-run` ✅ 源杰科技(688498) → WAIT信号(30分)
+  - `--backtest 600036` ✅ 招商银行回测完成（2025-10-30~2026-06-16）
+  - `--status` ✅ 显示空仓+风控状态
+  - 微信推送通道测试 ✅ Server酱正常
+
+**今日量化信号：**
+- 源杰科技(688498): ⏸️ 观望 | 上升趋势 · 追强模式 | 评分30（买入45/卖出15）
+- 招商银行(600036): ⏸️ 观望 | 过渡期 · 防御模式 | 评分0（信号混杂）
+
+**发现的问题：**
+- ⚠️ **GitHub Actions 未自动触发**：最后 CI 推送是 6/12，6/15-17 无自动推送记录
+  - 可能原因：cron schedule 失效（常见于 repo inactivity）、交易日检查失败
+  - 今日手动推送成功验证管线正常
+- ⚠️ `market_data.py` 板块排名/主力趋势 akshare 调用仍可能触发 SSL 问题（已加 `NO_PROXY` 到 main.py）
+- ⚠️ `stock_zh_a_hist`（eastmoney push2his）在 Windows TLS(Schannel) 环境不稳定，建议统一迁移到 `stock_zh_a_daily`
+
+**待办事项：**
+- [ ] CI 自动推送恢复 — 检查 GitHub Actions cron 是否因 inactivity 被暂停
+- [ ] `market_data.py` / `technical_filter.py` 中 akshare 调用统一迁移到新浪源
+- [ ] 量化模块添加更多标的到观察列表，累积持仓数据
+- [ ] 量化 CI (`quant-push.yml`) 实际触发验证
 
 ---
 

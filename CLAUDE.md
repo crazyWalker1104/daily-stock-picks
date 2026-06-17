@@ -19,6 +19,15 @@ python -m src.main --scrape-only
 # 指定日期运行
 python -m src.main --date 2026-06-01
 
+# 量化跟投模块 (Phase 5)
+python -m src.quant --pick              # 从推荐池筛选候选标的
+python -m src.quant --symbol 000001     # 对指定标的全流程分析+信号
+python -m src.quant --status            # 查看持仓状态+浮动盈亏
+python -m src.quant --backtest 000001   # 历史回测验证
+python -m src.quant --watch             # 每日跟踪模式（自动加载观察列表）
+python -m src.quant --daily-run         # 自动化日终管线（信号+推送，CI调用）
+python -m src.quant --execute           # 模拟执行当前信号
+
 # 安装依赖（需要代理）
 export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897
 pip install -r requirements.txt
@@ -54,6 +63,17 @@ python -m src.factor_analyzer --format json      # JSON输出
 | **推荐数据库** | [src/database.py](src/database.py) | SQLite持久化+历史查询+统计+策略回测+CLI工具（Phase 3.1/3.4） | 调整统计维度时 |
 | **因子分析** | [src/factor_analyzer.py](src/factor_analyzer.py) | 因子有效性检验：相关性+IC+分组+分位数+排名（Phase 3.2） | 累积20+追踪样本后 |
 | **策略分类** | [src/strategy_classifier.py](src/strategy_classifier.py) | 规则打分三维归类：追强/抄底/事件驱动（Phase 3.3） | 调整权重时 |
+| **量化模块入口** | [src/quant/__init__.py](src/quant/__init__.py) | Phase 5 量化跟投模块入口（独立于推荐管线） | 新增模块时 |
+| **量化数据模型** | [src/quant/models.py](src/quant/models.py) | QuantSignal / Position / TradeRecord / BacktestResult | 新增字段时 |
+| **技术指标** | [src/quant/indicators.py](src/quant/indicators.py) | MACD/RSI/布林/KDJ/ATR/ADX/OBV 纯Python计算 | 新增指标时 |
+| **市场状态** | [src/quant/regime.py](src/quant/regime.py) | 趋势/震荡/过渡识别 → 自适应策略切换 | 调整判定逻辑时 |
+| **信号引擎** | [src/quant/signals.py](src/quant/signals.py) | 多因子规则打分 → 开/加/持/减/清/观望 | 调整因子权重时 |
+| **仓位风控** | [src/quant/risk.py](src/quant/risk.py) | 仓位计算+止损止盈+风控熔断+T+1约束 | 调整风控参数时 |
+| **持仓跟踪** | [src/quant/tracker.py](src/quant/tracker.py) | JSON持久化+浮动盈亏+交易历史+信号快照 | 改存储结构时 |
+| **标的筛选** | [src/quant/stock_picker.py](src/quant/stock_picker.py) | 从推荐池SQLite量化选Top3候选 | 调整筛选维度时 |
+| **历史回测** | [src/quant/backtest.py](src/quant/backtest.py) | 单标的历史回测（T+1/手续费/印花税） | 调整回测逻辑时 |
+| **量化引擎** | [src/quant/engine.py](src/quant/engine.py) | QuantEngine主引擎编排所有子模块 | 改主流程时 |
+| **量化CLI** | [src/quant/cli.py](src/quant/cli.py) | CLI：--pick/--symbol/--status/--backtest/--watch | 新增命令时 |
 | **AI分析** | [src/ai_analyzer.py](src/ai_analyzer.py) | DeepSeek API调用 + System Prompt + JSON解析 | 调Prompt/换模型时 |
 | **格式化** | [src/formatter.py](src/formatter.py) | Markdown/纯文本/HTML邮件/HTML网页 四种输出 | 改模板样式时 |
 | **推送模块** | [src/pusher.py](src/pusher.py) | BasePusher + 4通道 + 注册表 + Pusher管理器 | 新增推送通道时 |
@@ -89,7 +109,19 @@ Daily Stock Picks/
 │   ├── database.py         # SQLite数据库：持久化+历史查询+统计（Phase 3.1）
 │   ├── factor_analyzer.py  # 因子有效性检验：相关性+IC+排名（Phase 3.2）
 │   ├── strategy_classifier.py  # 策略分层：追强/抄底/事件驱动三维归类（Phase 3.3）
-│   └── scrapers/
+│   └── quant/                   # Phase 5: 量化跟投模块（独立于推荐管线）
+│       ├── __init__.py          # 模块入口，导出公共接口
+│       ├── models.py            # 数据模型：信号/持仓/交易/回测
+│       ├── indicators.py        # 技术指标：MACD/RSI/布林/KDJ/ATR/ADX
+│       ├── regime.py            # 市场状态识别：趋势/震荡自适应
+│       ├── signals.py           # 信号引擎：多因子规则打分
+│       ├── engine.py            # 主引擎：编排所有子模块
+│       ├── risk.py              # 仓位风控：止损止盈+熔断
+│       ├── tracker.py           # 持仓跟踪：JSON持久化
+│       ├── stock_picker.py      # 选股：从推荐池量化筛选
+│       ├── backtest.py          # 回测：历史策略验证
+│       └── cli.py               # CLI入口
+├── scrapers/
 │       ├── __init__.py      # 爬虫注册中心 SCRAPER_REGISTRY
 │       ├── base.py          # 基类：UA轮换、重试、HTML/JSON通用方法
 │       ├── cls.py           # 财联社（API不稳定，默认关闭）
@@ -188,6 +220,7 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-15 | v3.0 | Phase 5: 量化跟投模块 — 独立 src/quant/ (11文件) + 指标/状态/信号/风控/回测/CLI |
 | 2026-06-12 | v2.5 | Phase 3.4: 策略回测（按策略维度胜率对比 + DB策略回填 + --strategy CLI）|
 | 2026-06-10 | v2.4 | Phase 3.3: 策略分层（追强/抄底/事件驱动三维规则打分+管线注入+四格式输出）|
 | 2026-06-10 | — | fix: _safe_float() 处理push2 API返回字符串类型数值 |  
@@ -218,6 +251,7 @@ Daily Stock Picks/
 | 因子有效性检验 | ✅ 新增 | 相关性+IC+分组+分位数+因子排名（Phase 3.2） |
 | 策略分层 | ✅ 新增 | 追强/抄底/事件驱动三维规则打分（Phase 3.3） |
 | 策略回测 | ✅ 新增 | 按策略维度胜率对比统计 + DB回填（Phase 3.4） |
+| 量化跟投模块 | ✅ 新增 | 独立 src/quant/ — 指标/状态/信号/风控/回测/CLI（Phase 5） |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
 | QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
 | 163邮箱推送 | ✅ 就绪 | SMTP 465/SSL，授权码登录 |
@@ -236,10 +270,12 @@ Daily Stock Picks/
 | Phase 2 | 2026-06-03 ~ 06-04 | 量化因子：资金×情绪确认 ✅ + 技术面过滤 ✅ + 多因子打分 ✅ | [DEVLOG.md](DEVLOG.md) |
 | Phase 3 | 2026-06-04 ~ 06-21 | 数据沉淀：SQLite推荐库 ✅ + 因子检验 ✅ + 策略分层 ✅ + 策略回测 ✅ | [DEVLOG.md](DEVLOG.md) |
 | Phase 4 | 2026-06-22+ | 策略进化：新数据源 + 行业热力图 + 报告升级 | [DEVLOG.md](DEVLOG.md) |
+| Phase 5 | 2026-06-15 | 量化跟投模块：11文件/指标/状态/信号/风控/回测/CLI ✅ | [DEVLOG.md](DEVLOG.md) |
 
 **当前优先事项（P0）：**
 - [ ] 数据源稳定性 — push2/akshare 连接频繁断开，需增加重试机制或替代源
-- [x] Phase 3.4: 策略回测 — 按策略维度胜率对比 ✅
+- [x] Phase 5: 量化跟投模块 — 独立 src/quant/ (11文件) ✅
 - [ ] GitHub Pages 启用 — 仓库 Settings → Pages → main /docs
+- [x] Phase 3.4: 策略回测 — 按策略维度胜率对比 ✅
 - [x] Phase 3.1-3.3 全部完成：SQLite数据库 + 因子分析 + 策略分层
 - [x] CI git push 已修复（reset--soft 替代 rebase），待下次交易日验证

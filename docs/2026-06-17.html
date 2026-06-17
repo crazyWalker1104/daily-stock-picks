@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日A股速递 | 2026-06-17</title>
+<style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+        background:#f0f2f5;color:#1a1a1a;line-height:1.6;min-height:100vh;
+    }
+    .wrapper{max-width:820px;margin:0 auto;padding:24px 16px;}
+
+    /* 导航 */
+    nav{margin-bottom:20px;}
+    nav h3{font-size:14px;color:#999;margin-bottom:8px;font-weight:500;}
+    nav ul{list-style:none;display:flex;flex-wrap:wrap;gap:6px;}
+    nav a{
+        display:inline-block;padding:5px 13px;background:#e6f0ff;border-radius:6px;
+        text-decoration:none;color:#3b82f6;font-size:13px;font-weight:500;transition:all .15s;
+    }
+    nav a:hover,nav a.active{background:#3b82f6;color:#fff;}
+
+    /* 头部 */
+    .header{
+        background:linear-gradient(160deg,#0f0c29 0%,#1a1a2e 30%,#16213e 60%,#0f3460 100%);
+        background-color:#1a1a2e;border-radius:14px 14px 0 0;padding:36px 32px 28px;color:#fff;
+    }
+    .header h1{font-size:26px;font-weight:800;letter-spacing:1px;margin-bottom:6px;}
+    .header .date{font-size:15px;color:rgba(255,255,255,0.82);margin-bottom:12px;}
+    .header .meta{font-size:12px;color:rgba(255,255,255,0.55);}
+
+    /* 内容区 */
+    .content{background:#fff;padding:28px 24px 20px;}
+    .content:last-child{border-radius:0 0 14px 14px;}
+
+    /* 推荐卡片 */
+    .rec-card{
+        background:#fff;border-radius:10px;margin-bottom:18px;
+        border:1px solid #eee;border-left:4px solid #d4380d;
+        box-shadow:0 1px 6px rgba(0,0,0,0.04);overflow:hidden;
+    }
+    .rec-card .card-body{padding:20px 22px;}
+    .rec-card .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .rec-card .sector{font-size:18px;font-weight:700;}
+    .rec-card .confidence-badge{
+        display:inline-block;padding:4px 14px;border-radius:14px;
+        font-size:11px;font-weight:700;color:#fff;letter-spacing:1px;
+    }
+    .rec-card .stock-tags{margin:14px 0 6px;}
+    .rec-card .stock-tag{
+        display:inline-block;padding:4px 12px;margin:2px 6px 2px 0;
+        border-radius:4px;font-size:13px;font-weight:600;
+    }
+    .rec-card .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;}
+    .rec-card .info-cell{
+        padding:12px 10px;background:#f8fafb;border-radius:6px;font-size:13px;
+    }
+    .rec-card .info-cell.risk{font-weight:500;}
+    .rec-card .info-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+
+    /* 评分条 */
+    .score-section{margin-top:14px;padding-top:12px;border-top:1px dashed #eee;}
+    .score-section .score-label{font-size:11px;color:#999;margin-bottom:6px;}
+    .score-row{display:flex;align-items:center;margin-bottom:5px;}
+    .score-name{font-size:12px;font-weight:600;color:#555;width:56px;text-align:right;margin-right:10px;flex-shrink:0;}
+    .score-bar-wrap{flex:1;max-width:200px;height:6px;background:#eee;border-radius:3px;overflow:hidden;}
+    .score-bar{display:block;height:6px;border-radius:3px;transition:width .3s;}
+    .score-val{font-size:13px;font-weight:700;margin-left:8px;min-width:26px;}
+    .score-ma{font-size:11px;color:#999;margin-left:6px;}
+
+    /* 确认 / 技术面 section */
+    .section-box{
+        border-radius:10px;margin-top:18px;margin-bottom:18px;padding:18px 22px;border:1px solid;
+    }
+    .section-box h3{font-size:15px;font-weight:700;margin-bottom:10px;}
+    .section-box p{font-size:13px;color:#555;margin:3px 0;}
+
+    /* 追踪 */
+    .tracking-table{width:100%;border-collapse:collapse;margin-top:10px;}
+    .tracking-table th{text-align:left;font-size:11px;color:#aaa;padding:7px 10px;background:#fafafa;}
+    .tracking-table td{padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;}
+
+    /* 页脚 */
+    .footer{background:#fafafa;border-radius:0 0 14px 14px;padding:22px 28px;border-top:1px solid #eee;}
+    .footer .disclaimer{font-size:12px;color:#999;line-height:1.8;}
+    .footer .timestamp{font-size:11px;color:#bbb;margin-top:8px;}
+
+    /* 辅助 */
+    .empty-state{text-align:center;padding:48px 20px;color:#ccc;font-size:18px;}
+    .empty-state .empty-icon{font-size:56px;margin-bottom:12px;}
+    .divider{border:none;border-top:1px solid #eee;margin:18px 0;}
+
+    @media(max-width:640px){
+        .rec-card .info-grid{grid-template-columns:1fr;}
+        .wrapper{padding:12px 8px;}
+    }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+    <nav>
+        <h3>📅 历史报告</h3>
+        <ul><li class="active"><a href="2026-06-17.html">2026-06-17</a></li>
+<li><a href="2026-06-15.html">2026-06-15</a></li>
+<li><a href="2026-06-12.html">2026-06-12</a></li>
+<li><a href="2026-06-11.html">2026-06-11</a></li>
+<li><a href="2026-06-10.html">2026-06-10</a></li>
+<li><a href="2026-06-09.html">2026-06-09</a></li>
+<li><a href="2026-06-08.html">2026-06-08</a></li>
+<li><a href="2026-06-05.html">2026-06-05</a></li>
+<li><a href="2026-06-04.html">2026-06-04</a></li>
+<li><a href="2026-06-03.html">2026-06-03</a></li>
+<li><a href="2026-06-02.html">2026-06-02</a></li>
+<li><a href="2026-05-31.html">2026-05-31</a></li></ul>
+    </nav>
+
+    <div class="header">
+        <h1>📊 每日A股速递</h1>
+        <div class="date">2026-06-17 · 周三</div>
+        <div class="meta">🤖 AI综合分析 | 采集 40 条信息 | 来源：sina、eastmoney</div>
+    </div>
+
+    <div class="content">
+        
+    <div class="rec-card" style="border-left-color:#d4380d;">
+        <div class="card-body">
+            <div class="card-header">
+                <span class="sector">🔥 半导体设备/检测<span style="display:inline-block;background:#f0f5ff;color:#2f54eb;padding:3px 10px;margin-left:8px;border-radius:12px;font-size:11px;font-weight:600;border:1px solid #2f54eb44;">⚡ 事件驱动</span></span>
+                <span class="confidence-badge" style="background:#d4380d;">信心 高</span>
+            </div>
+            <div class="stock-tags"><span style="color:#999;font-size:12px;">🏷️ 标的：</span><span class="stock-tag" style="background:#fff2f0;color:#d4380d;border:1px solid #d4380d22;">天准科技<span style="color:#999;font-weight:400;font-size:11px;"> 688003</span></span><span class="stock-tag" style="background:#fff2f0;color:#d4380d;border:1px solid #d4380d22;">长川科技<span style="color:#999;font-weight:400;font-size:11px;"> 300604</span></span></div>
+            <div class="info-grid">
+                <div class="info-cell">
+                    <div class="info-label">💡 推荐逻辑</div>
+                    多篇研报聚焦半导体设备国产替代，天准科技CPO检测、长川科技SoC测试机、神工股份硅材料均获推荐，板块资金关注度高。
+                </div>
+                <div class="info-cell">
+                    <div class="info-label">⚡ 催化事件</div>
+                    爱建证券、东吴证券等多家券商首次覆盖或强烈推荐，强调CPO检测、存储测试机等新增长点。
+                </div>
+                <div class="info-cell risk" style="background:#fff2f0;color:#d4380d;">
+                    <div class="info-label">⚠️ 风险提示</div>
+                    板块短期涨幅较大，需警惕获利回吐；日本科技进口激增可能加剧竞争。
+                </div>
+            </div>
+            <div class="score-section"><div class="score-label">📊 技术面（盘前·待确认）</div><div class="score-row"><span class="score-name">天准科技</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div><div class="score-row"><span class="score-name">长川科技</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div></div>
+        </div>
+    </div>
+    <div class="rec-card" style="border-left-color:#d48806;">
+        <div class="card-body">
+            <div class="card-header">
+                <span class="sector">📈 储能/新能源</span>
+                <span class="confidence-badge" style="background:#d48806;">信心 中</span>
+            </div>
+            <div class="stock-tags"><span style="color:#999;font-size:12px;">🏷️ 标的：</span><span class="stock-tag" style="background:#fffbe6;color:#d48806;border:1px solid #d4880622;">海博思创<span style="color:#999;font-weight:400;font-size:11px;"> 688411</span></span><span class="stock-tag" style="background:#fffbe6;color:#d48806;border:1px solid #d4880622;">鹏辉能源<span style="color:#999;font-weight:400;font-size:11px;"> 300438</span></span></div>
+            <div class="info-grid">
+                <div class="info-cell">
+                    <div class="info-label">💡 推荐逻辑</div>
+                    储能业务放量驱动修复，海博思创海外市场突破、鹏辉能源产品结构优化，亿纬锂能Q2业绩超预期。
+                </div>
+                <div class="info-cell">
+                    <div class="info-label">⚡ 催化事件</div>
+                    山西证券、东吴证券研报指出储能全链条服务能力显现，海外订单持续突破。
+                </div>
+                <div class="info-cell risk" style="background:#fffbe6;color:#d48806;">
+                    <div class="info-label">⚠️ 风险提示</div>
+                    行业竞争加剧，价格战风险；海外贸易壁垒不确定性。
+                </div>
+            </div>
+            <div class="score-section"><div class="score-label">📊 技术面（盘前·待确认）</div><div class="score-row"><span class="score-name">海博思创</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div><div class="score-row"><span class="score-name">鹏辉能源</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div></div>
+        </div>
+    </div>
+    <div class="rec-card" style="border-left-color:#d48806;">
+        <div class="card-body">
+            <div class="card-header">
+                <span class="sector">📈 AI/算力</span>
+                <span class="confidence-badge" style="background:#d48806;">信心 中</span>
+            </div>
+            <div class="stock-tags"><span style="color:#999;font-size:12px;">🏷️ 标的：</span><span class="stock-tag" style="background:#fffbe6;color:#d48806;border:1px solid #d4880622;">芯原股份<span style="color:#999;font-weight:400;font-size:11px;"> 688521</span></span><span class="stock-tag" style="background:#fffbe6;color:#d48806;border:1px solid #d4880622;">联瑞新材<span style="color:#999;font-weight:400;font-size:11px;"> 688300</span></span></div>
+            <div class="info-grid">
+                <div class="info-cell">
+                    <div class="info-label">💡 推荐逻辑</div>
+                    中美算力竞争利好国内企业，芯原股份估值较低；联瑞新材受益AI浪潮，填料需求增长。
+                </div>
+                <div class="info-cell">
+                    <div class="info-label">⚡ 催化事件</div>
+                    群益证券指出中美算力竞争利好公司，西南证券强调联瑞新材充分受益AI浪潮。
+                </div>
+                <div class="info-cell risk" style="background:#fffbe6;color:#d48806;">
+                    <div class="info-label">⚠️ 风险提示</div>
+                    AI板块前期涨幅较大，短期回调压力；海外制裁风险。
+                </div>
+            </div>
+            <div class="score-section"><div class="score-label">📊 技术面（盘前·待确认）</div><div class="score-row"><span class="score-name">芯原股份</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div><div class="score-row"><span class="score-name">联瑞新材</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div></div>
+        </div>
+    </div>
+    <div class="rec-card" style="border-left-color:#8c8c8c;">
+        <div class="card-body">
+            <div class="card-header">
+                <span class="sector">📌 光伏/商业航天<span style="display:inline-block;background:#f6ffed;color:#237804;padding:3px 10px;margin-left:8px;border-radius:12px;font-size:11px;font-weight:600;border:1px solid #23780444;">🎯 抄底</span></span>
+                <span class="confidence-badge" style="background:#8c8c8c;">信心 低</span>
+            </div>
+            <div class="stock-tags"><span style="color:#999;font-size:12px;">🏷️ 标的：</span><span class="stock-tag" style="background:#fafafa;color:#8c8c8c;border:1px solid #8c8c8c22;">钧达股份<span style="color:#999;font-weight:400;font-size:11px;"> 002865</span></span></div>
+            <div class="info-grid">
+                <div class="info-cell">
+                    <div class="info-label">💡 推荐逻辑</div>
+                    钧达股份光伏主业筑底反转，商业航天闭环成型，题材共振但短期催化不足。
+                </div>
+                <div class="info-cell">
+                    <div class="info-label">⚡ 催化事件</div>
+                    开源证券首次覆盖，看好光伏+商业航天双轮驱动。
+                </div>
+                <div class="info-cell risk" style="background:#fafafa;color:#8c8c8c;">
+                    <div class="info-label">⚠️ 风险提示</div>
+                    光伏行业产能过剩，商业航天商业化进程缓慢。
+                </div>
+            </div>
+            <div class="score-section"><div class="score-label">📊 技术面（盘前·待确认）</div><div class="score-row"><span class="score-name">钧达股份</span><span class="score-ma" style="color:#999;">⏳ 待确认</span></div></div>
+        </div>
+    </div>
+        <div class="section-box" style="background:#f6ffed;border-color:#b7eb8f;"><h3>🔍 双重确认</h3><p><strong>资金面信号**：北向资金基本持平 +0.00亿</strong></p><p><strong>板块情绪**：3个板块偏多，1个中性</strong></p><p>❓ **待确认**：半导体设备/检测、储能/新能源、AI/算力、光伏/商业航天</p></div>
+        <div class="section-box" style="background:#f0f5ff;border-color:#adc6ff;"><h3>📋 技术面过滤结果</h3><p><strong>过滤统计**：检查 7 只标的 → 通过 7 | 警告 0 | 排除 0</strong></p><p style='font-weight:600;margin-top:10px;'>半导体设备/检测</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **天准科技**（688003）| 待盘中确认</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **长川科技**（300604）| 待盘中确认</p><p style='font-weight:600;margin-top:10px;'>储能/新能源</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **海博思创**（688411）| 待盘中确认</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **鹏辉能源**（300438）| 待盘中确认</p><p style='font-weight:600;margin-top:10px;'>AI/算力</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **芯原股份**（688521）| 待盘中确认</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **联瑞新材**（688300）| 待盘中确认</p><p style='font-weight:600;margin-top:10px;'>光伏/商业航天</p><p style='font-size:13px;margin:2px 0 2px 8px;'>- ✅ **钧达股份**（002865）| 待盘中确认</p></div>
+        <div class="section-box" style="background:#fff7e6;border-color:#ffd591;"><h3>📐 策略分布</h3><p style="font-size:14px;color:#555;">🎯抄底1 · ⚡事件驱动1 · 👀观望2</p></div>
+        
+    </div>
+
+    <div class="footer">
+        <div class="disclaimer">
+            ⚠️ <strong>免责声明</strong>：以上内容由AI自动生成，仅供学习参考和技术交流，
+            <span style="color:#d4380d;">不构成任何投资建议</span>。股市有风险，投资需谨慎。
+        </div>
+        <div class="timestamp">生成时间：2026-06-17T08:59:36</div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:#ccc;">
+        每日A股智能推荐系统 · Powered by DeepSeek AI
+    </div>
+
+</div>
+</body>
+</html>

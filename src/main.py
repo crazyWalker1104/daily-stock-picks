@@ -2,6 +2,12 @@
 
 import os
 import sys
+
+# 绕过 Windows 系统代理（国内金融 API 直连，避免 SSLEOFError）
+# 必须在所有模块导入前设置，因为 akshare 等库的 requests.Session 会在导入时初始化
+os.environ.setdefault('NO_PROXY', '*')
+os.environ.setdefault('no_proxy', '*')
+
 import json
 import logging
 import argparse

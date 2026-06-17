@@ -1,0 +1,169 @@
+name: 量化跟投每日推送
+
+on:
+  schedule:
+    # 每个交易日 15:07 CST (7:07 UTC) — 收盘后运行
+    - cron: '7 7 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: '指定股票代码（留空使用观察列表）'
+        required: false
+        default: ''
+      dry_run:
+        description: '干运行（不实际推送）'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quant-push
+  cancel-in-progress: false
+
+jobs:
+  quant-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ── Step 1: 检出 ──────────────────────────────────────
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Step 2: Python 环境 ────────────────────────────────
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Step 3: 交易日检查 ────────────────────────────────
+      - name: 检查交易日
+        id: check_trading
+        run: |
+          python -c "
+          from datetime import datetime
+          try:
+              import akshare as ak
+              df = ak.tool_trade_date_hist_sina()
+              today = datetime.now().strftime('%Y-%m-%d')
+              trade_dates = df['trade_date'].astype(str).values
+              is_trading = today in trade_dates
+              print(f'TRADING_DAY={str(is_trading).lower()}')
+              print(f'DATE={today}')
+          except Exception as e:
+              print(f'交易日检查失败: {e}，默认执行')
+              print('TRADING_DAY=true')
+              print(f'DATE={datetime.now().strftime(\"%Y-%m-%d\")}')
+          " > trading_check.txt
+          cat trading_check.txt
+          cat trading_check.txt >> $GITHUB_OUTPUT
+
+      # ── Step 4: 运行量化跟投 ──────────────────────────────
+      - name: 运行量化跟投
+        id: pipeline
+        continue-on-error: true
+        if: steps.check_trading.outputs.TRADING_DAY == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          WECHAT_SENDKEY: ${{ secrets.WECHAT_SENDKEY }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python -m src.quant --daily-run --dry-run 2>&1
+          elif [ -n "${{ github.event.inputs.symbol }}" ]; then
+            python -m src.quant --symbol "${{ github.event.inputs.symbol }}" 2>&1
+          else
+            python -m src.quant --daily-run 2>&1
+          fi
+          echo "PIPELINE_EXIT=$?" >> pipeline_status.txt
+          cat pipeline_status.txt
+
+      # ── Step 5: 诊断日志 ──────────────────────────────────
+      - name: 诊断日志
+        if: (!cancelled())
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  量化跟投 · 诊断信息"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "交易日: ${{ steps.check_trading.outputs.TRADING_DAY }}"
+          echo "日期:   ${{ steps.check_trading.outputs.DATE }}"
+          echo "触发:   ${{ github.event_name }}"
+          echo "管线结果: ${{ steps.pipeline.outcome }}"
+          echo ""
+          echo "--- data/quant/ 目录 ---"
+          ls -laR data/quant/ 2>/dev/null || echo "  (空)"
+
+      # ── Step 6: 提交数据更新 ──────────────────────────────
+      - name: 提交数据更新
+        id: git_push
+        if: (!cancelled()) && (steps.check_trading.outputs.TRADING_DAY == 'true' || github.event_name == 'workflow_dispatch')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/quant/
+
+          if git diff --cached --quiet; then
+            echo "无变更，跳过提交"
+            exit 0
+          fi
+
+          git commit -m "📊 更新量化跟投数据 [${{ steps.check_trading.outputs.DATE }}]" || {
+            echo "提交失败（可能无变更），跳过"
+            exit 0
+          }
+
+          # 带指数退避的重试推送
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+
+            if git rebase origin/main 2>/dev/null; then
+              if git push origin main; then
+                echo "✅ 推送成功 (attempt $i)"
+                exit 0
+              fi
+            else
+              git rebase --abort 2>/dev/null || true
+              git reset --soft origin/main
+              git add data/quant/
+              git commit -m "📊 更新量化跟投数据 [${{ steps.check_trading.outputs.DATE }}]" || true
+              if git push origin main; then
+                echo "✅ 推送成功 (reset 方式, attempt $i)"
+                exit 0
+              fi
+            fi
+
+            if [ $i -lt 5 ]; then
+              WAIT=$((i * 10))
+              echo "⏳ 推送失败，${WAIT}s 后重试 ($i/5)..."
+              sleep $WAIT
+            fi
+          done
+
+          echo "❌ 推送最终失败（已重试 5 次）"
+          exit 1
+
+      # ── Step 7: 告警 ──────────────────────────────────────
+      - name: 管线异常告警
+        if: steps.pipeline.outcome == 'failure'
+        run: |
+          echo "⚠️  量化跟托管线执行异常"
+          echo "请检查上方日志排查 API/网络问题"
+
+      - name: 推送异常告警
+        if: steps.git_push.outcome == 'failure'
+        run: |
+          echo "⚠️  git push 最终失败，请检查 GitHub 连接或手动推送"
