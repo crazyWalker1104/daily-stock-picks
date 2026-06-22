@@ -33,6 +33,11 @@ import os
 os.environ.setdefault('NO_PROXY', '*')
 os.environ.setdefault('no_proxy', '*')
 
+# 加载 .env 环境变量（必须在导入 pusher 之前，因为 WeChatPusher
+# 在实例化时读取 WECHAT_SENDKEY 环境变量）
+from dotenv import load_dotenv
+load_dotenv()
+
 from src.quant.models import (
     SignalType, MarketRegime, StrategyMode,
     QuantSignal, Position, TradeRecord, StockCandidate,
@@ -51,6 +56,7 @@ from src.quant.tracker import PositionTracker
 from src.quant.stock_picker import pick_candidates
 from src.quant.formatter import (
     format_signal_wechat, format_signal_email, format_daily_summary_email,
+    format_status_wechat,
 )
 from src.quant.pusher import QuantPusher
 from src.quant.daily_runner import run_daily
@@ -80,5 +86,5 @@ __all__ = [
 
     # 推送 (Phase 5.9)
     "QuantPusher", "format_signal_wechat", "format_signal_email",
-    "format_daily_summary_email", "run_daily",
+    "format_daily_summary_email", "format_status_wechat", "run_daily",
 ]

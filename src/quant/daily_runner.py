@@ -112,7 +112,7 @@ def run_daily(
     else:
         pusher = QuantPusher()
 
-        # 4a. 紧急信号 → 微信
+        # 4a. 紧急信号 → 微信（完整信号详情）
         if signal.signal in ACTIONABLE_SIGNALS:
             logger.info(f"🚨 可操作信号，推送微信...")
             result = pusher.push_signal(signal)
@@ -121,7 +121,15 @@ def run_daily(
             else:
                 logger.warning("微信推送失败或被跳过")
         else:
-            logger.info(f"信号 {signal.signal.value} 非紧急，跳过微信推送")
+            # 非紧急信号 → 微信（每日状态摘要）
+            logger.info(f"📡 非紧急信号，推送每日状态到微信...")
+            position_text = tracker.get_status_text()
+            risk_stats = risk.get_stats()
+            result = pusher.push_status(signal, position_text, risk_stats)
+            if result.get("wechat"):
+                logger.info("微信状态推送成功")
+            else:
+                logger.warning("微信状态推送失败或被跳过")
 
         # 4b. 每日总结 → 邮件
         position_text = tracker.get_status_text()

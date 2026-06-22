@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 from src.pusher import EmailPusher, WeChatPusher
 from src.quant.formatter import (
     format_signal_wechat, format_signal_email, format_daily_summary_email,
+    format_status_wechat,
 )
 from src.quant.models import QuantSignal, SignalType, StockCandidate
 
@@ -122,6 +123,32 @@ class QuantPusher:
             results["email"] = False
 
         results["wechat"] = False  # 日结不走微信
+        return results
+
+    def push_status(self, signal: QuantSignal,
+                    position_text: str = "",
+                    risk_stats: dict = None) -> Dict[str, bool]:
+        """推送每日量化状态（微信精简版）
+
+        用于 WAIT/HOLD 等非紧急信号的每日状态更新。
+        始终推送到微信，让用户了解当前跟踪状态。
+
+        Returns:
+            {channel: success} 字典
+        """
+        results = {}
+
+        if self.wechat_enabled and self.wechat.is_configured():
+            title = f"📡 量化跟投 | {signal.symbol_name} 每日状态"
+            body = format_status_wechat(signal, position_text, risk_stats)
+            results["wechat"] = self.wechat.send_message(title, body)
+            if results["wechat"]:
+                logger.info(f"量化状态已推送至微信: {signal.symbol} "
+                            f"{signal.signal.value}")
+        else:
+            results["wechat"] = False
+
+        results["email"] = False  # 日结走邮件，不走这里
         return results
 
     def push_candidates(self, candidates: List["StockCandidate"]) -> Dict[str, bool]:

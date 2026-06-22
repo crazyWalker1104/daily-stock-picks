@@ -3,7 +3,7 @@
 为微信（ServerChan Markdown）和邮件（HTML）生成量化信号推送内容。
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from src.quant.models import (
     QuantSignal, Position, SIGNAL_EMOJI, SIGNAL_CN, REGIME_CN, MODE_CN,
@@ -64,6 +64,81 @@ def format_signal_wechat(signal: QuantSignal) -> str:
     lines.append("")
     lines.append("---")
     lines.append("🤖 量化信号 · 仅供参考 · 不构成投资建议")
+
+    return "\n".join(lines)
+
+
+def format_status_wechat(signal: QuantSignal, position_text: str = "",
+                         risk_stats: dict = None) -> str:
+    """每日量化状态微信推送（精简版，WAIT/HOLD 时使用）
+
+    与 format_signal_wechat 的区别：更紧凑，侧重状态摘要而非操作建议。
+    """
+    emoji = SIGNAL_EMOJI.get(signal.signal, "❓")
+    action = SIGNAL_CN.get(signal.signal, "未知")
+    regime = REGIME_CN.get(signal.regime, "未知")
+    mode = MODE_CN.get(signal.mode, "未知")
+
+    # 评分条（10格精简版）
+    bar_len = 10
+    bar_fill = max(1, int(abs(signal.total_score) / 100 * bar_len))
+    if signal.total_score >= 0:
+        bar = "█" * bar_fill + "░" * (bar_len - bar_fill)
+    else:
+        bar = "░" * (bar_len - bar_fill) + "█" * bar_fill
+
+    lines = [
+        f"## 📡 量化跟投 · 每日状态",
+        "",
+        f"**{signal.symbol_name}**（{signal.symbol}）| {emoji} {action}",
+        f"- 评分 [{bar}] {signal.total_score:.0f}/100（买入{signal.buy_score:.0f} 卖出{signal.sell_score:.0f}）",
+        f"- 市场：{regime} | 策略：{mode} | 现价：{signal.current_price:.2f}",
+    ]
+
+    # 技术指标
+    ind = signal.indicators
+    if ind:
+        rsi = ind.get("rsi14", 0)
+        macd = ind.get("macd_hist", 0)
+        adx = ind.get("adx", 0)
+        vr = ind.get("volume_ratio", 1)
+        ma5 = ind.get("ma5", 0)
+        ma20 = ind.get("ma20", 0)
+        ma_icon = "✓" if ma5 > ma20 else "✗"
+        lines.append(
+            f"- 指标：RSI{rsi:.0f} | MACD{macd:+.2f} | ADX{adx:.0f} | "
+            f"量比{vr:.2f} | MA5>MA20{ma_icon}"
+        )
+
+    # 因子摘要
+    if signal.score_details:
+        buy_items = {k: v for k, v in signal.score_details.items()
+                     if not k.startswith("sell_") and k != "sell_details"}
+        sell_details = signal.score_details.get("sell_details", {})
+        if buy_items:
+            buy_summary = " · ".join(
+                f"+{v:.0f} {k}" for k, v in
+                sorted(buy_items.items(), key=lambda x: -x[1])[:3] if v > 0
+            )
+            if buy_summary:
+                lines.append(f"- 📈 {buy_summary}")
+        if sell_details:
+            sell_summary = " · ".join(
+                f"-{v:.0f} {k}" for k, v in
+                sorted(sell_details.items(), key=lambda x: -x[1])[:3] if v > 0
+            )
+            if sell_summary:
+                lines.append(f"- 📉 {sell_summary}")
+
+    # 止损止盈
+    if signal.stop_loss > 0:
+        lines.append(f"- 🛡 止损：{signal.stop_loss:.2f} | 🎯 止盈：{signal.take_profit:.2f}")
+
+    lines.append("")
+    lines.append(f"> {signal.reasoning}")
+    lines.append("")
+    lines.append("---")
+    lines.append("⏰ 每日15:00更新 | 量化信号仅供参考")
 
     return "\n".join(lines)
 
