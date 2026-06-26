@@ -220,6 +220,8 @@ Daily Stock Picks/
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-06-26 | v3.3 | fix: 量化模块 CLI 中文日志乱码 (sys.stderr UTF-8) + load_dotenv() 修复微信推送 |
+| 2026-06-22 | v3.2 | feat: 量化状态推送 — WAIT/HOLD 不再静默，format_status_wechat + push_status |
 | 2026-06-15 | v3.0 | Phase 5: 量化跟投模块 — 独立 src/quant/ (11文件) + 指标/状态/信号/风控/回测/CLI |
 | 2026-06-12 | v2.5 | Phase 3.4: 策略回测（按策略维度胜率对比 + DB策略回填 + --strategy CLI）|
 | 2026-06-10 | v2.4 | Phase 3.3: 策略分层（追强/抄底/事件驱动三维规则打分+管线注入+四格式输出）|
@@ -251,14 +253,15 @@ Daily Stock Picks/
 | 因子有效性检验 | ✅ 新增 | 相关性+IC+分组+分位数+因子排名（Phase 3.2） |
 | 策略分层 | ✅ 新增 | 追强/抄底/事件驱动三维规则打分（Phase 3.3） |
 | 策略回测 | ✅ 新增 | 按策略维度胜率对比统计 + DB回填（Phase 3.4） |
-| 量化跟投模块 | ✅ 新增 | 独立 src/quant/ — 指标/状态/信号/风控/回测/CLI（Phase 5） |
+| 量化跟投模块 | ✅ 就绪 | 独立 src/quant/ — 指标/状态/信号/风控/回测/CLI/推送（Phase 5） |
+| 量化推送 | ✅ 就绪 | 微信(紧急信号+每日状态) + 邮件(日结)，CI 15:07自动运行 |
 | AI分析 | ✅ 就绪 | DeepSeek API 已配置，正常运行 |
 | QQ邮箱推送 | ✅ 就绪 | SMTP 587/STARTTLS，授权码登录 |
 | 163邮箱推送 | ✅ 就绪 | SMTP 465/SSL，授权码登录 |
-| 微信推送 | ✅ 新增 | Server酱 (sct.ftqq.com)，需 WECHAT_SENDKEY |
-| 通道选择 | ✅ 新增 | YAML `enabled` 或 CLI `--push email,wechat,...` |
-| GitHub Actions | ⚠️ 待验证 | 代码已推送，Secrets已配置，待交易日自动触发验证 |
-| GitHub Pages | ⚠️ 待验证 | 需在仓库Settings中启用Pages（Source: main, /docs） |
+| 微信推送 | ✅ 就绪 | Server酱 (sct.ftqq.com)，需 WECHAT_SENDKEY |
+| 通道选择 | ✅ 就绪 | YAML `enabled` 或 CLI `--push email,wechat,...` |
+| GitHub Actions | ✅ 就绪 | 短线 8:30/9:35 + 量化 15:07，CI 已验证正常运行 |
+| GitHub Pages | ✅ 就绪 | 已启用，docs/ 自动部署 |
 
 ## 后续计划
 
@@ -273,9 +276,10 @@ Daily Stock Picks/
 | Phase 5 | 2026-06-15 | 量化跟投模块：11文件/指标/状态/信号/风控/回测/CLI ✅ | [DEVLOG.md](DEVLOG.md) |
 
 **当前优先事项（P0）：**
-- [ ] 数据源稳定性 — push2/akshare 连接频繁断开，需增加重试机制或替代源
-- [x] Phase 5: 量化跟投模块 — 独立 src/quant/ (11文件) ✅
-- [ ] GitHub Pages 启用 — 仓库 Settings → Pages → main /docs
-- [x] Phase 3.4: 策略回测 — 按策略维度胜率对比 ✅
-- [x] Phase 3.1-3.3 全部完成：SQLite数据库 + 因子分析 + 策略分层
-- [x] CI git push 已修复（reset--soft 替代 rebase），待下次交易日验证
+- [ ] 源杰科技 06-15 初始价格异常（39 → 1612），排查 fetch_klines 日期范围
+- [ ] market_data.py akshare 调用迁移到 Sina 源（akshare 连接频繁断开）
+- [ ] 量化模块添加更多标的到观察列表，累积持仓数据
+- [x] ✅ 量化 CLI 中文日志乱码修复 (2026-06-26)
+- [x] ✅ 量化微信推送修复 (load_dotenv, 2026-06-22)
+- [x] ✅ WAIT/HOLD 状态推送 (format_status_wechat, 2026-06-22)
+- [x] ✅ CI git push / GitHub Pages 均已验证正常

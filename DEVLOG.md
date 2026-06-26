@@ -1,6 +1,6 @@
 # 开发日志 · Daily Stock Picks
 
-> 最后更新：2026-06-17 | 当前阶段：Phase 5 — 量化跟投模块 ✅（3.1-3.4 ✅ 全部完成）
+> 最后更新：2026-06-26 | 当前阶段：Phase 5 — 量化跟投模块 ✅（3.1-3.4 ✅ 全部完成）
 
 ---
 
@@ -400,6 +400,56 @@
 - [ ] `market_data.py` / `technical_filter.py` 中 akshare 调用统一迁移到新浪源
 - [ ] 量化模块添加更多标的到观察列表，累积持仓数据
 - [ ] 量化 CI (`quant-push.yml`) 实际触发验证
+
+---
+
+### 2026-06-26 (周五) — v3.3
+
+**完成事项：**
+- 🐛 **CLI 中文日志乱码修复**：
+  - 根因：`src/quant/cli.py` 只用 `sys.stdout.reconfigure()` 修复了 stdout，但 `logging.basicConfig` 默认输出到 **stderr**，stderr 仍是 Windows GBK 编码
+  - 修复：改为与 `main.py` 一致的 `io.TextIOWrapper` 包裹方案，覆盖 stdout + stderr
+  - 验证：`--daily-run` 日志中文完美显示，不再出现 "΢��״̬" 等乱码
+- 🐛 **量化微信推送修复**（关键修复）：
+  - 根因：`src/quant/__init__.py` 缺少 `load_dotenv()` 调用，`.env` 里的 `WECHAT_SENDKEY` 从未加载
+  - `WeChatPusher.is_configured()` 返回 False → push_status/push_signal 静默跳过
+  - 修复：`__init__.py` 在导入 pusher 模块之前调用 `load_dotenv()`
+  - 验证：`push_status()` 返回 `{'wechat': True}` ✅
+- 📡 **6/22-26 量化推送全部正常**：
+  - 源杰科技(688498) 信号趋势：6/17=35 → 6/18=35 → 6/22-26=25
+  - 市场始终 `trending_up`，策略 `trend_following`
+  - 买入因子（45→35）：MA多头 + MACD动能 + OBV
+  - 卖出因子（10→20→10）：RSI超买
+  - 始终 WAIT（<60 不触发开仓），逻辑合理
+- 📊 **6/18-26 短线推送**：各交易日正常，4通道全通
+
+**量化信号趋势（6/15~6/26）：**
+```
+日期        信号   评分  买入  卖出  市场            价格
+06-15       wait     0    0    0  transition       39.34 ← 初始数据异常
+06-17       wait    35   45   10  trending_up    1612.00
+06-18       wait    35   45   10  trending_up    1673.36
+06-22       wait    25   45   20  trending_up    1873.50
+06-23       wait    25   45   20  trending_up    1873.50
+06-26       wait    25   35   10  trending_up    1875.00
+```
+
+**待办事项：**
+- [ ] 06-15 初始价格 39.34 异常（应为~1600+区间），疑似 fetch_klines 日期范围问题
+- [ ] CI cron 稳定性验证 — 6/22-23 CI 已正常生成推送，待持续观察
+- [ ] 源杰科技 RSI 持续超买(80+)，评分下降，考虑是否需要调整因子权重
+
+---
+
+### 2026-06-22~23 (周一~二) — v3.2
+
+**完成事项：**
+- 📡 **状态推送功能**：WAIT/HOLD 信号不再静默，改为推送"每日状态摘要"
+  - 新增 `format_status_wechat()` — 精简 Markdown 格式（评分条+指标摘要+因子明细）
+  - 新增 `QuantPusher.push_status()` — 微信通道，始终推送
+  - 修改 `daily_runner.py` — 非紧急信号时调用 `push_status()` 而非跳过
+- 🔀 **远程 CI 数据合并**：`git merge` 远程 CI 自动生成的数据文件，accept theirs
+- 📊 **6/22-23 推送**：短线+量化均 8 通道全通
 
 ---
 
