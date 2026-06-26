@@ -15,11 +15,11 @@ import logging
 import os
 import sys
 
-# 编码兼容（Windows GBK）
-try:
-    sys.stdout.reconfigure(encoding='utf-8')
-except Exception:
-    pass
+# Windows UTF-8 编码兼容（必须在 logging 初始化前设置）
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 logging.basicConfig(
     level=logging.INFO,
