@@ -1,0 +1,81 @@
+# 每日A股推荐系统 - 配置
+# 已为微信推送场景配置
+
+# AI 模型配置
+ai:
+  provider: deepseek
+  model: deepseek-chat
+  max_tokens: 2000
+  temperature: 0.3
+
+# 信息源开关
+sources:
+  cls: false
+  eastmoney: true
+  xueqiu: false
+  sina: true
+
+# 推送配置（仅微信 + Web）
+push:
+  email:
+    enabled: false       # 你没配 SMTP，关闭
+  wechat:
+    enabled: true        # ← 关键：改为 true
+    provider: serverchan
+  cli:
+    enabled: true
+  web:
+    enabled: true
+
+# 爬虫配置
+scraper:
+  request_delay: 2
+  timeout: 15
+  max_retries: 3
+
+# 输出配置
+output:
+  max_recommendations: 5
+  save_raw_data: true
+
+# 技术面过滤配置
+technical_filter:
+  enabled: true
+  min_turnover_rate: 0.5
+  small_cap_threshold_yi: 20
+  micro_cap_threshold_yi: 5
+  limit_up_threshold: 9.5
+  limit_up_threshold_gem: 19.5
+  consecutive_rise_warning: 3
+  consecutive_rise_exclude: 5
+  volume_surge_ratio: 2.0
+  volume_shrink_ratio: 0.3
+  use_akshare_enhancement: true
+
+# 策略分层
+strategy_classifier:
+  enabled: true
+  min_score_to_classify: 15
+  min_margin: 5
+  momentum:
+    tech_score_high: 80
+    tech_score_mid: 70
+  bottom_fish:
+    tech_score_max: 74
+    tech_score_min: 60
+  event:
+    tech_score_max: 79
+    tech_score_min: 60
+
+# 因子有效性分析
+factor_analysis:
+  enabled: true
+  min_samples_for_stats: 10
+  quantile_bins: 4
+  inject_into_report: false
+
+# SQLite 推荐数据库
+database:
+  enabled: true
+  path: data/recommendations.db
+  migrate_on_start: true
